@@ -22,7 +22,7 @@ const Admin = () => {
   const verifyUser = async (id) => {
     const token = localStorage.getItem('token');
     const config = { headers: { Authorization: `Bearer ${token}` } };
-    await axios.patch(`http://kazi-connect.onrender.com/api/admin/users/${id}/verify`, {}, config);
+    await axios.patch(`https://kazi-connect.onrender.com/api/admin/users/${id}/verify`, {}, config);
     window.location.reload();
   };
 
