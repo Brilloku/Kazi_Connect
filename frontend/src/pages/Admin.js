@@ -10,9 +10,9 @@ const Admin = () => {
       const token = localStorage.getItem('token');
       if (token) {
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const usersRes = await axios.get('http://localhost:5000/api/admin/users', config);
+        const usersRes = await axios.get('http://kazi-connect.onrender.com/api/admin/users', config);
         setUsers(usersRes.data);
-        const tasksRes = await axios.get('http://localhost:5000/api/admin/tasks', config);
+        const tasksRes = await axios.get('http://kazi-connect.onrender.com/api/admin/tasks', config);
         setTasks(tasksRes.data);
       }
     };
@@ -22,7 +22,7 @@ const Admin = () => {
   const verifyUser = async (id) => {
     const token = localStorage.getItem('token');
     const config = { headers: { Authorization: `Bearer ${token}` } };
-    await axios.patch(`http://localhost:5000/api/admin/users/${id}/verify`, {}, config);
+    await axios.patch(`http://kazi-connect.onrender.com/api/admin/users/${id}/verify`, {}, config);
     window.location.reload();
   };
 

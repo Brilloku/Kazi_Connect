@@ -9,7 +9,7 @@ const BrowseTasks = () => {
       const token = localStorage.getItem('token');
       if (token) {
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const res = await axios.get('http://localhost:5000/api/tasks', config);
+        const res = await axios.get('http://kazi-connect.onrender.com/api/tasks', config);
         setTasks(res.data);
       }
     };
@@ -19,7 +19,7 @@ const BrowseTasks = () => {
   const acceptTask = async (id) => {
     const token = localStorage.getItem('token');
     const config = { headers: { Authorization: `Bearer ${token}` } };
-    await axios.patch(`http://localhost:5000/api/tasks/${id}/accept`, {}, config);
+    await axios.patch(`http://kazi-connect.onrender.com/api/tasks/${id}/accept`, {}, config);
     window.location.reload();
   };
 
