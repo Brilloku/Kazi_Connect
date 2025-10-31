@@ -22,5 +22,10 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/admin', require('./routes/admin'));
 
+// ✅ Test route
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API working ✅' });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
