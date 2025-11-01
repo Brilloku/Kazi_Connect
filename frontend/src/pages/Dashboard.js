@@ -100,7 +100,7 @@ const Dashboard = () => {
         <div>
           <h2 className="text-xl font-semibold mb-4 text-gray-700">Active Tasks</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {tasks.filter(t => t.client._id === user._id).map(task => (
+            {tasks.filter(t => t.client && t.client._id === user._id).map(task => (
               <div key={task._id} className="bg-white shadow-lg rounded-xl p-6 border border-gray-100">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-semibold text-gray-800">{task.title}</h3>

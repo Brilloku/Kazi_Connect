@@ -1,4 +1,4 @@
-# Kenyan Youth Services Platform
+now# Kenyan Youth Services Platform
 
 A web platform connecting Kenyan youths with service opportunities and clients seeking skilled workers. Built with MERN stack (MongoDB, Express.js, React, Node.js).
 
@@ -88,7 +88,7 @@ npm start
 ```
 
 The application will be available at:
-- Frontend: http://localhost:3000
+- Frontend: https://kazi-connect-five.vercel.app
 - Backend: https://kazi-connect.onrender.com
 
 ## Deployment

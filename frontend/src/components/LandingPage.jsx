@@ -6,7 +6,19 @@ import { FiUser, FiSearch, FiTrendingUp, FiShield, FiMapPin, FiCreditCard, FiTar
 const LandingPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-green-50 to-yellow-50">
-      {/* Top navbar removed — use global `Navbar` component instead to avoid duplicate headers */}
+      {/* Navbar */}
+      <nav className="sticky top-0 z-50 bg-white shadow-md">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <Link to="/" className="text-2xl font-bold text-blue-600">Kazilink</Link>
+          <div className="space-x-6">
+            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">Home</Link>
+            <Link to="/about" className="text-gray-700 hover:text-blue-600 transition-colors">About</Link>
+            <Link to="/opportunities" className="text-gray-700 hover:text-blue-600 transition-colors">Opportunities</Link>
+            <Link to="/login" className="text-gray-700 hover:text-blue-600 transition-colors">Login</Link>
+            <Link to="/register" className="bg-blue-600 text-white px-4 py-2 rounded-2xl hover:bg-blue-700 transition-colors">Register</Link>
+          </div>
+        </div>
+      </nav>
 
       {/* Hero Section */}
       <motion.section
@@ -26,7 +38,7 @@ const LandingPage = () => {
             <Link to="/register" className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg">
               Get Started
             </Link>
-            <Link to="/tasks" className="bg-green-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg">
+            <Link to="/login" className="bg-green-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg">
               Browse Tasks
             </Link>
           </div>

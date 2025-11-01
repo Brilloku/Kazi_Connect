@@ -1,19 +1,32 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { supabase } from './supabase';
+
+console.log('API URL:', process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
 
 const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
+// Log all requests in development
+axiosInstance.interceptors.request.use(request => {
+  console.log('Starting Request:', {
+    method: request.method,
+    url: request.url,
+    baseURL: request.baseURL
+  });
+  return request;
+});
+
+// Request interceptor to add Supabase JWT token
 axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
     }
     return config;
   },
@@ -27,13 +40,14 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error);
-    
+
     if (error.response) {
       // Handle specific HTTP errors
       switch (error.response.status) {
         case 401:
         case 403:
-          localStorage.removeItem('token');
+          // Sign out user on auth errors
+          supabase.auth.signOut();
           // Only redirect if we're not already on the login page
           if (!window.location.pathname.includes('/login')) {
             toast.error('Session expired. Please login again.');
