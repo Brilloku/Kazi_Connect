@@ -1,0 +1,1 @@
+- [x] Edit backend/utils/emailService.js to remove all resend-related code (import, client creation, email sending function), keeping only generateVerificationToken

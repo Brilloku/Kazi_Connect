@@ -2,10 +2,10 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { supabase } from './supabase';
 
-console.log('API URL:', process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
+console.log('API URL:', process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com/api');
 
 const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
