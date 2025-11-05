@@ -9,6 +9,7 @@ import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import VerifyEmail from './pages/VerifyEmail';
+import AuthCallback from './pages/AuthCallback';
 import ResetPassword from './pages/ResetPassword';
 
 import Dashboard from './pages/Dashboard';
@@ -27,6 +28,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/login" element={<Login />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route

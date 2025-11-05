@@ -233,4 +233,24 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
+// Supabase verify endpoint for callback
+router.post('/supabase-verify', async (req, res) => {
+  try {
+    const { email, supabaseId } = req.body;
+    const user = await User.findOne({ email });
+
+    if (user) {
+      user.emailVerified = true;
+      user.supabaseId = supabaseId;
+      await user.save();
+      return res.status(200).json({ message: 'User verified and updated' });
+    }
+
+    res.status(404).json({ message: 'User not found' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

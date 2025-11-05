@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   location: { type: String },
   skills: [{ type: String }], // For youths
   phone: { type: String },
+  emailVerified: { type: Boolean, default: false },
 
   createdAt: { type: Date, default: Date.now },
 });
