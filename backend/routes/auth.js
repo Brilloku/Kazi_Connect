@@ -1,7 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const User = require('../models/User');
-const verifySupabaseUser = require('../middleware/verifySupabaseUser');
+const { verifySupabaseUser } = require('../middleware/verifySupabaseUser');
 
 const router = express.Router();
 
@@ -142,11 +142,17 @@ router.post('/logout', async (req, res) => {
 // Verify email status
 router.get('/verify', verifySupabaseUser, async (req, res) => {
   try {
-    const { supabaseUser } = req;
+    // Get user from Supabase to check verification status
+    const { data: { user }, error } = await supabase.auth.getUser(req.header('Authorization').replace('Bearer ', ''));
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
     res.json({
-      verified: !!supabaseUser.email_confirmed_at,
-      email: supabaseUser.email,
-      confirmed_at: supabaseUser.email_confirmed_at
+      verified: !!user.email_confirmed_at,
+      email: user.email,
+      confirmed_at: user.email_confirmed_at
     });
   } catch (e) {
     console.error('Verify email error:', e);

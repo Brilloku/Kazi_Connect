@@ -28,28 +28,50 @@ const VerifyEmail = () => {
           // Check if email is confirmed
           if (data.session.user.email_confirmed_at) {
             toast.success('Email verified successfully!');
-            setMessage('Email verified successfully! Redirecting to dashboard...');
-            setTimeout(() => navigate('/dashboard'), 2000);
+            setMessage('Email verified successfully! Creating your account...');
+
+            // Create MongoDB user record
+            try {
+              const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com'}/api/auth/login`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${data.session.access_token}`
+                },
+                body: JSON.stringify({
+                  email: data.session.user.email,
+                  password: 'dummy' // Not used for Supabase auth
+                })
+              });
+
+              if (response.ok) {
+                const userData = await response.json();
+                setMessage('Account created successfully! Redirecting to dashboard...');
+                setTimeout(() => {
+                  // Redirect based on user role
+                  const role = userData.user?.role;
+                  if (role === 'admin') navigate('/admin');
+                  else if (role === 'youth') navigate('/browse-tasks');
+                  else navigate('/dashboard');
+                }, 2000);
+              } else {
+                console.error('Failed to create user record');
+                setMessage('Account verification successful, but there was an issue setting up your profile. Please try logging in.');
+                setTimeout(() => navigate('/login'), 3000);
+              }
+            } catch (err) {
+              console.error('Error creating user record:', err);
+              setMessage('Account verification successful, but there was an issue setting up your profile. Please try logging in.');
+              setTimeout(() => navigate('/login'), 3000);
+            }
           } else {
             setMessage('Email verification is still pending. Please check your email.');
             toast.info('Email verification pending');
           }
         } else {
-          // Handle hash parameters for email confirmation
-          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-
-          if (sessionError) {
-            console.error('Session retrieval error:', sessionError);
-            setMessage('Verification link may be invalid or expired.');
-            toast.error('Invalid verification link');
-          } else if (sessionData.session?.user.email_confirmed_at) {
-            toast.success('Email verified successfully!');
-            setMessage('Email verified successfully! Redirecting to dashboard...');
-            setTimeout(() => navigate('/dashboard'), 2000);
-          } else {
-            setMessage('Unable to verify email. Please try logging in or request a new verification email.');
-            toast.error('Verification failed');
-          }
+          setMessage('No active session found. Please try logging in or request a new verification email.');
+          toast.error('No active session found');
+          setTimeout(() => navigate('/login'), 3000);
         }
       } catch (err) {
         console.error('Verification error:', err);
