@@ -6,7 +6,7 @@ import AuthBackground from '../components/AuthBackground';
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams(); // eslint-disable-line no-unused-vars
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
 
