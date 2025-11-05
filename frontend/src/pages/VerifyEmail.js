@@ -46,6 +46,7 @@ const VerifyEmail = () => {
 
               if (response.ok) {
                 const userData = await response.json();
+                console.log('MongoDB user created:', userData);
                 setMessage('Account created successfully! Redirecting to dashboard...');
                 setTimeout(() => {
                   // Redirect based on user role
@@ -55,7 +56,9 @@ const VerifyEmail = () => {
                   else navigate('/dashboard');
                 }, 2000);
               } else {
-                console.error('Failed to create user record');
+                console.error('Failed to create user record:', response.status, response.statusText);
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
                 setMessage('Account verification successful, but there was an issue setting up your profile. Please try logging in.');
                 setTimeout(() => navigate('/login'), 3000);
               }

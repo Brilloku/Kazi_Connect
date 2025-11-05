@@ -97,7 +97,7 @@ router.post('/login', async (req, res) => {
       // Create user record if it doesn't exist
       user = new User({
         supabaseId: data.user.id,
-        name: data.user.user_metadata?.name || '',
+        name: data.user.user_metadata?.name || data.user.email.split('@')[0],
         email: data.user.email,
         role: data.user.user_metadata?.role || 'client',
         location: data.user.user_metadata?.location || '',
@@ -105,6 +105,9 @@ router.post('/login', async (req, res) => {
         phone: data.user.user_metadata?.phone || ''
       });
       await user.save();
+      console.log('Created new MongoDB user:', user._id);
+    } else {
+      console.log('Found existing MongoDB user:', user._id);
     }
 
     res.json({
