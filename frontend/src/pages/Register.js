@@ -53,14 +53,21 @@ const Register = () => {
         toast.success('Registration successful! Please check your email to verify your account.');
         navigate('/verify-email');
       } else if (data.session) {
-        // User is auto-confirmed, proceed to backend registration
-        const res = await axiosInstance.post('/auth/register', {
-          ...formData,
-          skills: formData.skills ? formData.skills.split(',').map(s => s.trim()) : []
-        });
+        // User is auto-confirmed, create MongoDB record via backend
+        try {
+          const res = await axiosInstance.post('/auth/register', {
+            ...formData,
+            skills: formData.skills ? formData.skills.split(',').map(s => s.trim()) : []
+          });
 
-        toast.success(res.data.message || 'Registration successful!');
-        navigate('/dashboard');
+          toast.success(res.data.message || 'Registration successful!');
+          navigate('/dashboard');
+        } catch (backendError) {
+          console.error('Backend registration error:', backendError);
+          // Even if backend fails, user is registered in Supabase
+          toast.success('Registration successful! You can now log in.');
+          navigate('/login');
+        }
       }
     } catch (err) {
       console.error('Registration error:', err);

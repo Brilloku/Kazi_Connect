@@ -1,17 +1,32 @@
-import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import axiosInstance from '../utils/axios';
+import { supabase } from '../utils/supabase';
 import AuthBackground from '../components/AuthBackground';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isValidSession, setIsValidSession] = useState(false);
+
+  useEffect(() => {
+    // Check if we have a valid session for password reset
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) {
+        toast.error('Invalid or expired reset link. Please request a new password reset.');
+        navigate('/login');
+        return;
+      }
+      setIsValidSession(true);
+    };
+
+    checkSession();
+  }, [navigate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,24 +39,47 @@ const ResetPassword = () => {
       return;
     }
 
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters long.');
+      return;
+    }
+
     setIsLoading(true);
-    const token = searchParams.get('token');
 
     try {
-      const res = await axiosInstance.post('/auth/reset-password', {
-        token,
+      const { error } = await supabase.auth.updateUser({
         password: formData.password
       });
-      toast.success(res.data.message || 'Password reset successfully!');
+
+      if (error) {
+        console.error('Password update error:', error);
+        toast.error(error.message);
+        return;
+      }
+
+      toast.success('Password updated successfully! Please log in with your new password.');
       navigate('/login');
     } catch (err) {
       console.error('Reset password error:', err);
-      const errorMessage = err.response?.data?.error || 'Password reset failed.';
-      toast.error(errorMessage);
+      toast.error('Failed to update password. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!isValidSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+        <AuthBackground />
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 relative">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p>Validating reset link...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
@@ -56,10 +94,11 @@ const ResetPassword = () => {
             <input
               type="password"
               name="password"
-              placeholder="Enter new password"
+              placeholder="Enter new password (min 6 characters)"
               onChange={handleChange}
               className="w-full p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               required
+              minLength={6}
             />
           </div>
 
@@ -72,6 +111,7 @@ const ResetPassword = () => {
               onChange={handleChange}
               className="w-full p-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               required
+              minLength={6}
             />
           </div>
 
@@ -80,7 +120,7 @@ const ResetPassword = () => {
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors duration-200"
             disabled={isLoading}
           >
-            {isLoading ? 'Resetting...' : 'Reset Password'}
+            {isLoading ? 'Updating...' : 'Update Password'}
           </button>
         </form>
       </div>

@@ -7,7 +7,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-  origin: ['https://kazi-connect-five.vercel.app', 'http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: ['https://kazi-connect-ecdz.vercel.app', 'http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true
 }));
 app.use(express.json());
@@ -35,6 +35,17 @@ app.get('/', (req, res) => {
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/admin', require('./routes/admin'));
+
+// Update available routes list
+console.log('Available routes:');
+console.log('- GET    /');
+console.log('- POST   /api/auth/register');
+console.log('- POST   /api/auth/login');
+console.log('- POST   /api/auth/logout');
+console.log('- GET    /api/auth/verify');
+console.log('- GET    /api/auth/me');
+console.log('- PUT    /api/auth/me');
+console.log('- POST   /api/auth/resend-verification');
 
 // Error handling middleware
 app.use((err, req, res, next) => {

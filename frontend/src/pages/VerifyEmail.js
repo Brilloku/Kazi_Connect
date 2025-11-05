@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import axiosInstance from '../utils/axios';
+import { supabase } from '../utils/supabase';
 import AuthBackground from '../components/AuthBackground';
 
 const VerifyEmail = () => {
@@ -12,30 +12,56 @@ const VerifyEmail = () => {
 
   useEffect(() => {
     const verifyEmail = async () => {
-      const token = searchParams.get('token');
-      if (!token) {
-        setMessage('Invalid verification link.');
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        const res = await axiosInstance.post('/auth/verify-email', { token });
-        toast.success(res.data.message || 'Email verified successfully!');
-        setMessage('Email verified successfully! You can now log in.');
-        setTimeout(() => navigate('/login'), 3000);
+        // Handle email verification from Supabase redirect
+        const { data, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('Supabase session error:', error);
+          setMessage('Verification failed. Please try again.');
+          toast.error('Verification failed');
+          setIsLoading(false);
+          return;
+        }
+
+        if (data.session?.user) {
+          // Check if email is confirmed
+          if (data.session.user.email_confirmed_at) {
+            toast.success('Email verified successfully!');
+            setMessage('Email verified successfully! Redirecting to dashboard...');
+            setTimeout(() => navigate('/dashboard'), 2000);
+          } else {
+            setMessage('Email verification is still pending. Please check your email.');
+            toast.info('Email verification pending');
+          }
+        } else {
+          // Handle hash parameters for email confirmation
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+          if (sessionError) {
+            console.error('Session retrieval error:', sessionError);
+            setMessage('Verification link may be invalid or expired.');
+            toast.error('Invalid verification link');
+          } else if (sessionData.session?.user.email_confirmed_at) {
+            toast.success('Email verified successfully!');
+            setMessage('Email verified successfully! Redirecting to dashboard...');
+            setTimeout(() => navigate('/dashboard'), 2000);
+          } else {
+            setMessage('Unable to verify email. Please try logging in or request a new verification email.');
+            toast.error('Verification failed');
+          }
+        }
       } catch (err) {
         console.error('Verification error:', err);
-        const errorMessage = err.response?.data?.error || 'Verification failed.';
-        setMessage(errorMessage);
-        toast.error(errorMessage);
+        setMessage('An error occurred during verification. Please try again.');
+        toast.error('Verification failed');
       } finally {
         setIsLoading(false);
       }
     };
 
     verifyEmail();
-  }, [searchParams, navigate]);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
@@ -48,7 +74,15 @@ const VerifyEmail = () => {
             <p>Verifying your email...</p>
           </div>
         ) : (
-          <p className="text-gray-600">{message}</p>
+          <div>
+            <p className="text-gray-600 mb-4">{message}</p>
+            <button
+              onClick={() => navigate('/login')}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Go to Login
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const User = require('../models/User');
-const { auth } = require('../middleware/auth');
+const verifySupabaseUser = require('../middleware/verifySupabaseUser');
 
 const router = express.Router();
 
@@ -139,8 +139,23 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+// Verify email status
+router.get('/verify', verifySupabaseUser, async (req, res) => {
+  try {
+    const { supabaseUser } = req;
+    res.json({
+      verified: !!supabaseUser.email_confirmed_at,
+      email: supabaseUser.email,
+      confirmed_at: supabaseUser.email_confirmed_at
+    });
+  } catch (e) {
+    console.error('Verify email error:', e);
+    res.status(400).json({ error: 'Failed to verify email status' });
+  }
+});
+
 // Get profile (protected route)
-router.get('/me', auth, async (req, res) => {
+router.get('/me', verifySupabaseUser, async (req, res) => {
   try {
     const user = await User.findOne({ _id: req.user._id });
     if (!user) {
@@ -153,7 +168,7 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // Update profile
-router.put('/me', auth, async (req, res) => {
+router.put('/me', verifySupabaseUser, async (req, res) => {
   try {
     const updates = req.body;
     const allowedUpdates = ['name', 'location', 'skills', 'phone'];
