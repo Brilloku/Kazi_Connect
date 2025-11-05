@@ -27,7 +27,7 @@ const LandingPage = () => {
         transition={{ duration: 0.8 }}
         className="container mx-auto px-4 py-20 flex flex-col md:flex-row items-center"
       >
-        <div className="md:w-1/2 mb-10 md:mb-0">
+        <div className="w-full text-center mb-10 md:mb-0">
           <h1 className="text-5xl font-bold text-gray-800 mb-6">
             Empowering Kenyan Youth to <span className="text-blue-600">Work, Learn & Grow</span>
           </h1>
@@ -41,11 +41,6 @@ const LandingPage = () => {
             <Link to="/login" className="bg-green-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg">
               Browse Tasks
             </Link>
-          </div>
-        </div>
-        <div className="md:w-1/2">
-          <div className="bg-white p-8 rounded-2xl shadow-lg">
-            <img src="https://via.placeholder.com/400x300?text=Youth+Growth+Illustration" alt="Youth Growth" className="w-full rounded-2xl" />
           </div>
         </div>
       </motion.section>
