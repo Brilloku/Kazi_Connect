@@ -38,7 +38,10 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
       options: {
-        data: userData
+        data: userData,
+        emailRedirectTo: process.env.NODE_ENV === 'production'
+          ? 'https://kazi-connect-five.vercel.app/verify-email'
+          : 'http://localhost:3000/verify-email'
       }
     });
     return { data, error };
