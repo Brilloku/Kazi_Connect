@@ -2,91 +2,112 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { supabase } from '../utils/supabase';
+import { useAuth } from '../context/AuthContext';
 import AuthBackground from '../components/AuthBackground';
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams(); // eslint-disable-line no-unused-vars
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [hasAttemptedVerification, setHasAttemptedVerification] = useState(false);
 
   useEffect(() => {
-    const verifyEmail = async () => {
+    const createProfile = async (user) => {
+      if (hasAttemptedVerification) return;
+      setHasAttemptedVerification(true);
+
       try {
-        // Handle email verification from Supabase redirect
-        const { data, error } = await supabase.auth.getSession();
+        setMessage('Creating your profile...');
 
-        if (error) {
-          console.error('Supabase session error:', error);
-          setMessage('Verification failed. Please try again.');
-          toast.error('Verification failed');
-          setIsLoading(false);
-          return;
-        }
+        const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com'}/api/auth/createProfile`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            supabase_id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name,
+            role: user.user_metadata?.role,
+            location: user.user_metadata?.location,
+            skills: user.user_metadata?.skills,
+            phone: user.user_metadata?.phone
+          })
+        });
 
-        if (data.session?.user) {
-          // Check if email is confirmed
-          if (data.session.user.email_confirmed_at) {
-            toast.success('Email verified successfully!');
-            setMessage('Email verified successfully! Updating your account...');
-
-            // Create MongoDB user profile
-            try {
-              const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com'}/api/auth/createProfile`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  supabase_id: data.session.user.id,
-                  email: data.session.user.email,
-                  name: data.session.user.user_metadata?.name,
-                  role: data.session.user.user_metadata?.role,
-                  location: data.session.user.user_metadata?.location,
-                  skills: data.session.user.user_metadata?.skills,
-                  phone: data.session.user.user_metadata?.phone
-                })
-              });
-
-              if (response.ok) {
-                const result = await response.json();
-                console.log('MongoDB user profile created:', result);
-                setMessage('Account verified successfully! Redirecting to dashboard...');
-                setTimeout(() => {
-                  navigate('/dashboard');
-                }, 2000);
-              } else {
-                console.error('Failed to create user profile:', response.status, response.statusText);
-                const errorText = await response.text();
-                console.error('Error response:', errorText);
-                setMessage('Account verification successful, but there was an issue creating your profile. Please try logging in.');
-                setTimeout(() => navigate('/login'), 3000);
-              }
-            } catch (err) {
-              console.error('Error creating user profile:', err);
-              setMessage('Account verification successful, but there was an issue creating your profile. Please try logging in.');
-              setTimeout(() => navigate('/login'), 3000);
-            }
-          } else {
-            setMessage('Email verification is still pending. Please check your email.');
-            toast.info('Email verification pending');
-          }
+        if (response.ok) {
+          const result = await response.json();
+          console.log('MongoDB user profile created:', result);
+          toast.success('Account verified successfully!');
+          setMessage('Account verified successfully! Redirecting to dashboard...');
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 2000);
         } else {
-          setMessage('No active session found. Please try logging in or request a new verification email.');
-          toast.error('No active session found');
+          console.error('Failed to create user profile:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          setMessage('Account verification successful, but there was an issue creating your profile. Please try logging in.');
           setTimeout(() => navigate('/login'), 3000);
         }
       } catch (err) {
-        console.error('Verification error:', err);
-        setMessage('An error occurred during verification. Please try again.');
-        toast.error('Verification failed');
+        console.error('Error creating user profile:', err);
+        setMessage('Account verification successful, but there was an issue creating your profile. Please try logging in.');
+        setTimeout(() => navigate('/login'), 3000);
       } finally {
         setIsLoading(false);
       }
     };
 
-    verifyEmail();
-  }, [navigate]);
+    if (user) {
+      // User is logged in, check if email is verified
+      if (user.email_confirmed_at) {
+        createProfile(user);
+      } else {
+        setMessage('Email verification is still pending. Please check your email and click the verification link.');
+        setIsLoading(false);
+      }
+    } else {
+      // Listen for auth state changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed in VerifyEmail:', event, session?.user?.email);
+
+        if (event === 'SIGNED_IN' && session?.user) {
+          if (session.user.email_confirmed_at) {
+            createProfile(session.user);
+          } else {
+            setMessage('Email verification is still pending. Please check your email and click the verification link.');
+            setIsLoading(false);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setMessage('Session expired. Please try logging in again.');
+          setIsLoading(false);
+        }
+      });
+
+      // Check initial session
+      const checkInitialSession = async () => {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Session check error:', error);
+          setMessage('Unable to verify session. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+
+        if (!session) {
+          setMessage('Waiting for email verification. Please check your email and click the verification link.');
+          setIsLoading(false);
+        }
+      };
+
+      checkInitialSession();
+
+      return () => subscription.unsubscribe();
+    }
+  }, [user, navigate, hasAttemptedVerification]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
