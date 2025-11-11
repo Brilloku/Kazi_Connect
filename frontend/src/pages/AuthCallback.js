@@ -21,12 +21,17 @@ const AuthCallback = () => {
         const user = data.session.user;
         console.log("Verified Supabase user:", user);
 
-        // Send verified user info to your backend (Mongo)
+        // Create MongoDB user profile
         await axios.post(
-          `${process.env.REACT_APP_API_URL}/api/auth/supabase-verify`,
+          `${process.env.REACT_APP_API_URL}/api/auth/createProfile`,
           {
+            supabase_id: user.id,
             email: user.email,
-            supabaseId: user.id,
+            name: user.user_metadata?.name,
+            role: user.user_metadata?.role,
+            location: user.user_metadata?.location,
+            skills: user.user_metadata?.skills,
+            phone: user.user_metadata?.phone
           }
         );
 

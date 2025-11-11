@@ -233,7 +233,38 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
-// Supabase verify endpoint for callback
+// Create user profile in MongoDB after email verification
+router.post('/createProfile', async (req, res) => {
+  try {
+    const { supabase_id, email, name, role, location, skills, phone } = req.body;
+
+    // Check if user already exists in MongoDB
+    const existingUser = await User.findOne({ supabaseId: supabase_id });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Profile already exists' });
+    }
+
+    // Create user profile in MongoDB
+    const user = new User({
+      supabaseId: supabase_id,
+      name,
+      email,
+      role,
+      location,
+      skills: Array.isArray(skills) ? skills : (typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : []),
+      phone,
+      emailVerified: true
+    });
+
+    await user.save();
+    res.status(201).json({ message: 'Profile created successfully!', user: { id: user._id, name, email, role } });
+  } catch (e) {
+    console.error('Create profile error:', e);
+    res.status(400).json({ error: e.message || 'Failed to create profile' });
+  }
+});
+
+// Supabase verify endpoint for callback (deprecated, use createProfile)
 router.post('/supabase-verify', async (req, res) => {
   try {
     const { email, supabaseId } = req.body;

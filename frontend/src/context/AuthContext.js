@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axiosInstance from '../utils/axios';
 import { supabase } from '../utils/supabase';
 
 const AuthContext = createContext();
@@ -38,10 +37,7 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
       options: {
-        data: userData,
-        emailRedirectTo: process.env.NODE_ENV === 'production'
-          ? 'https://kazi-connect-ecdz.vercel.app/auth/callback'
-          : ''
+        data: userData
       }
     });
     return { data, error };

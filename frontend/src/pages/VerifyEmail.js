@@ -28,43 +28,43 @@ const VerifyEmail = () => {
           // Check if email is confirmed
           if (data.session.user.email_confirmed_at) {
             toast.success('Email verified successfully!');
-            setMessage('Email verified successfully! Creating your account...');
+            setMessage('Email verified successfully! Updating your account...');
 
-            // Create MongoDB user record
+            // Create MongoDB user profile
             try {
-              const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com'}/api/auth/login`, {
+              const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com'}/api/auth/createProfile`, {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${data.session.access_token}`
+                  'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
+                  supabase_id: data.session.user.id,
                   email: data.session.user.email,
-                  password: 'dummy' // Not used for Supabase auth
+                  name: data.session.user.user_metadata?.name,
+                  role: data.session.user.user_metadata?.role,
+                  location: data.session.user.user_metadata?.location,
+                  skills: data.session.user.user_metadata?.skills,
+                  phone: data.session.user.user_metadata?.phone
                 })
               });
 
               if (response.ok) {
-                const userData = await response.json();
-                console.log('MongoDB user created:', userData);
-                setMessage('Account created successfully! Redirecting to dashboard...');
+                const result = await response.json();
+                console.log('MongoDB user profile created:', result);
+                setMessage('Account verified successfully! Redirecting to dashboard...');
                 setTimeout(() => {
-                  // Redirect based on user role
-                  const role = userData.user?.role;
-                  if (role === 'admin') navigate('/admin');
-                  else if (role === 'youth') navigate('/browse-tasks');
-                  else navigate('/dashboard');
+                  navigate('/dashboard');
                 }, 2000);
               } else {
-                console.error('Failed to create user record:', response.status, response.statusText);
+                console.error('Failed to create user profile:', response.status, response.statusText);
                 const errorText = await response.text();
                 console.error('Error response:', errorText);
-                setMessage('Account verification successful, but there was an issue setting up your profile. Please try logging in.');
+                setMessage('Account verification successful, but there was an issue creating your profile. Please try logging in.');
                 setTimeout(() => navigate('/login'), 3000);
               }
             } catch (err) {
-              console.error('Error creating user record:', err);
-              setMessage('Account verification successful, but there was an issue setting up your profile. Please try logging in.');
+              console.error('Error creating user profile:', err);
+              setMessage('Account verification successful, but there was an issue creating your profile. Please try logging in.');
               setTimeout(() => navigate('/login'), 3000);
             }
           } else {

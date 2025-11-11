@@ -46,6 +46,7 @@ console.log('- GET    /api/auth/verify');
 console.log('- GET    /api/auth/me');
 console.log('- PUT    /api/auth/me');
 console.log('- POST   /api/auth/resend-verification');
+console.log('- POST   /api/auth/supabase-verify');
 
 // Error handling middleware
 app.use((err, req, res, next) => {

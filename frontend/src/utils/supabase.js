@@ -6,7 +6,7 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     redirectTo: process.env.NODE_ENV === 'production'
-      ? 'https://kazi-connect-ecdz.vercel.app/verify-email'
-      : 'http://localhost:3000/verify-email'
+      ? 'https://kazi-connect-ecdz.vercel.app/auth/callback'
+      : 'http://localhost:3000/auth/callback'
   }
 });
