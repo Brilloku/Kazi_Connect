@@ -12,7 +12,7 @@ const Login = () => {
     email: '',
     password: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // eslint-disable-line no-unused-vars
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -23,7 +23,7 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await signIn(formData.email, formData.password);
+      const { data, error } = await signIn(formData.email, formData.password); // eslint-disable-line no-unused-vars
 
       if (error) {
         toast.error(error.message);
