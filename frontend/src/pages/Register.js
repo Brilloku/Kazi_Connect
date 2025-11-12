@@ -20,7 +20,7 @@ const Register = () => {
     skills: '',
     phone: ''
   });
-  const [isLoading, setIsLoading] = useState(false); // eslint-disable-line no-unused-vars
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

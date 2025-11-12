@@ -11,69 +11,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZibG1qeGFneGVhbmdhaHFqc3B2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjAxMzcwNiwiZXhwIjoyMDc3NTg5NzA2fQ.r4Xb5i2FpCLPe_NHWBltxVEZ6xU8ogkjbEarb8Vfrkg'
 );
 
-// Register with Supabase
+// This endpoint is no longer used - registration is handled directly in frontend with Supabase
 router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password, role, location, skills, phone } = req.body;
-
-    // Check if user already exists in MongoDB
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email already registered' });
-    }
-
-    // Create user in Supabase Auth
-    const { data: supabaseUser, error: supabaseError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-          role,
-          location,
-          skills: Array.isArray(skills) ? skills : (typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : []),
-          phone
-        }
-      }
-    });
-
-    if (supabaseError) {
-      console.error('Supabase signup error:', supabaseError);
-      return res.status(400).json({ error: supabaseError.message });
-    }
-
-    // If user is created but needs email confirmation
-    if (supabaseUser.user && !supabaseUser.session) {
-      return res.status(201).json({
-        message: 'Registration successful. Please check your email to verify your account.',
-        user: { id: supabaseUser.user.id, email, name, role }
-      });
-    }
-
-    // If user is auto-confirmed, create MongoDB record
-    if (supabaseUser.user && supabaseUser.session) {
-      const user = new User({
-        supabaseId: supabaseUser.user.id,
-        name,
-        email,
-        role,
-        location,
-        skills: Array.isArray(skills) ? skills : (typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : []),
-        phone
-      });
-
-      await user.save();
-
-      res.status(201).json({
-        message: 'Registration successful!',
-        user: { id: user._id, name, email, role },
-        session: supabaseUser.session
-      });
-    }
-  } catch (e) {
-    console.error('Registration error:', e);
-    res.status(400).json({ error: e.message || 'Registration failed' });
-  }
+  return res.status(410).json({ error: 'This endpoint is deprecated. Use frontend registration.' });
 });
 
 // Login with Supabase

@@ -1,29 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../utils/axios';
 import { toast } from 'react-toastify';
 
 const Navbar = () => {
+  const { user: authUser, signOut } = useAuth();
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUser = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (token) {
+      if (authUser) {
+        try {
           const { data } = await axiosInstance.get('/auth/me');
           setUser(data);
+        } catch (err) {
+          console.error('Failed to fetch user:', err);
         }
-      } catch (err) {
-        console.error('Failed to fetch user:', err);
+      } else {
+        setUser(null);
       }
     };
     fetchUser();
-  }, []);
+  }, [authUser]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    await signOut();
     setUser(null);
     toast.success('Logged out successfully');
     navigate('/login');

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../utils/supabase'; // eslint-disable-line no-unused-vars
+import { supabase } from '../utils/supabase';
 
 const AuthContext = createContext();
 

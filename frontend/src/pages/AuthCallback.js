@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../utils/supabase"; // adjust path if needed
+import { supabase } from "../utils/supabase";
 import axios from "axios";
 
 const AuthCallback = () => {
@@ -9,7 +9,6 @@ const AuthCallback = () => {
   useEffect(() => {
     const verifyEmail = async () => {
       try {
-        // Exchange the email verification token with Supabase
         const { data, error } = await supabase.auth.getSession();
 
         if (error || !data?.session) {
@@ -35,7 +34,7 @@ const AuthCallback = () => {
           }
         );
 
-        navigate("/login?verified=true");
+        navigate("/dashboard");
       } catch (err) {
         console.error("Verification error:", err);
         navigate("/login?error=verification_failed");
