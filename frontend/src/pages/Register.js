@@ -40,7 +40,10 @@ const Register = () => {
       };
 
       // Sign up with Supabase
-      const { data, error } = await signUp(formData.email, formData.password, userData);
+      const { data, error } = await signUp(formData.email, formData.password, {
+        ...userData,
+        emailRedirectTo: `${window.location.origin}/verify-email`
+      });
 
       if (error) {
         toast.error(error.message);
