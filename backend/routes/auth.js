@@ -1,83 +1,220 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
-const User = require('../models/User');
 const { verifySupabaseUser } = require('../middleware/verifySupabaseUser');
+const User = require('../models/User');
 
 const router = express.Router();
 
-// Initialize Supabase client
+// Initialize Supabase client (for email verification only)
 const supabase = createClient(
   process.env.SUPABASE_URL || 'https://vblmjxagxeangahqjspv.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZibG1qeGFneGVhbmdhaHFqc3B2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjAxMzcwNiwiZXhwIjoyMDc3NTg5NzA2fQ.r4Xb5i2FpCLPe_NHWBltxVEZ6xU8ogkjbEarb8Vfrkg'
 );
 
-// This endpoint is no longer used - registration is handled directly in frontend with Supabase
+// Register with MongoDB + Supabase email verification
 router.post('/register', async (req, res) => {
-  return res.status(410).json({ error: 'This endpoint is deprecated. Use frontend registration.' });
+  try {
+    const { name, email, password, role = 'client' } = req.body;
+    console.log(`Register attempt for email: ${email}`);
+
+    // Create Supabase account for email verification (don't create MongoDB user yet)
+    const { data: supabaseData, error: supabaseError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role,
+          password // Store password in metadata for backend retrieval after verification
+        }
+      }
+    });
+
+    if (supabaseError) {
+      console.log(`Supabase signup error: ${supabaseError.message}`);
+      return res.status(400).json({ error: supabaseError.message });
+    }
+
+    console.log(`Supabase user created: ${email}, awaiting email verification`);
+
+    res.status(201).json({
+      message: 'User registered successfully. Please check your email for verification.',
+      user: {
+        id: supabaseData.user.id,
+        email: supabaseData.user.email
+      }
+    });
+  } catch (e) {
+    console.error('Registration error:', e);
+    res.status(500).json({ error: 'Registration failed' });
+  }
 });
 
-// Login with Supabase
+// Login with MongoDB
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log(`Login attempt for email: ${email}`);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+    // Find user in MongoDB
+    const user = await User.findOne({ email });
+    if (!user) {
+      console.log(`User not found in MongoDB: ${email}`);
+      return res.status(400).json({ error: 'Invalid credentials' });
+    }
+
+    console.log(`User found in MongoDB: ${email}, isEmailVerified: ${user.isEmailVerified}`);
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log(`Password mismatch for user: ${email}`);
+      return res.status(400).json({ error: 'Invalid credentials' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'your_jwt_secret',
+      { expiresIn: '7d' }
+    );
+
+    // Set secure HTTP-only cookie for token
+    res.cookie('backendToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      // Use 'lax' in development so cookies are sent on top-level navigations from other origins (localhost:3000 -> localhost:5000)
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
-    }
-
-    // Get or create user in MongoDB
-    let user = await User.findOne({ supabaseId: data.user.id });
-
-    if (!user) {
-      // Create user record if it doesn't exist
-      user = new User({
-        supabaseId: data.user.id,
-        name: data.user.user_metadata?.name || data.user.email.split('@')[0],
-        email: data.user.email,
-        role: data.user.user_metadata?.role || 'client',
-        location: data.user.user_metadata?.location || '',
-        skills: data.user.user_metadata?.skills || [],
-        phone: data.user.user_metadata?.phone || ''
-      });
-      await user.save();
-      console.log('Created new MongoDB user:', user._id);
-    } else {
-      console.log('Found existing MongoDB user:', user._id);
-    }
+    console.log(`Login successful for user: ${email}, token generated`);
 
     res.json({
       user: {
         id: user._id,
-        supabaseId: user.supabaseId,
         name: user.name,
         email: user.email,
         role: user.role,
         location: user.location,
         skills: user.skills,
-        phone: user.phone
+        phone: user.phone,
+        isEmailVerified: user.isEmailVerified
       },
-      session: data.session
+      token
     });
   } catch (e) {
     console.error('Login error:', e);
-    res.status(400).json({ error: e.message || 'Login failed' });
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Create or update profile when Supabase verification completes
+router.post('/createProfile', async (req, res) => {
+  try {
+    const { supabase_id, email, name, role = 'client', location, skills, phone, password } = req.body;
+    console.log(`createProfile called for email: ${email}, has password: ${!!password}`);
+
+    if (!email || !supabase_id) {
+      console.log(`Missing required fields: email=${email}, supabase_id=${supabase_id}`);
+      return res.status(400).json({ error: 'supabase_id and email are required' });
+    }
+
+    let hashedPassword = null;
+    if (password) {
+      // Use password provided during registration
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(password, salt);
+      console.log(`Using provided password for: ${email}`);
+    }
+
+    // Use findOneAndUpdate with upsert to handle duplicate calls safely
+    // Build separate $set and $setOnInsert objects to avoid setting the same
+    // path in both (which causes ConflictingUpdateOperators errors).
+    const setFields = {
+      supabaseId: supabase_id,
+      isEmailVerified: true
+    };
+
+    if (name) setFields.name = name;
+    if (location) setFields.location = location;
+    if (skills) setFields.skills = skills;
+    if (phone) setFields.phone = phone;
+    if (hashedPassword) setFields.password = hashedPassword;
+
+    // Fields that should only be set when creating a new document
+    const setOnInsert = { email, role };
+    if (!name) setOnInsert.name = 'New User';
+    if (!hashedPassword) setOnInsert.password = Math.random().toString(36).slice(-12);
+
+    const user = await User.findOneAndUpdate(
+      { email },
+      {
+        $set: setFields,
+        $setOnInsert: setOnInsert
+      },
+      {
+        upsert: true, // Create if doesn't exist
+        new: true, // Return the updated document
+        runValidators: true
+      }
+    );
+
+    console.log(`User profile upserted: ${email}, isEmailVerified: true`);
+
+    // Generate JWT token and set HTTP-only cookie
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '7d' });
+    res.cookie('backendToken', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+    console.log(`Token generated for user: ${email}`);
+
+    res.json({ user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      location: user.location,
+      skills: user.skills,
+      phone: user.phone,
+      isEmailVerified: user.isEmailVerified
+    }, token });
+  } catch (e) {
+    console.error('createProfile error:', e);
+    res.status(500).json({ error: 'Failed to create or update profile' });
   }
 });
 
 // Logout
 router.post('/logout', async (req, res) => {
   try {
+    // Clear the backendToken cookie
+    // Clear cookie by setting an expired cookie on the same path
+    res.cookie('backendToken', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      expires: new Date(0),
+      path: '/'
+    });
+
+    // Also instruct client to clear cookie explicitly
+    res.clearCookie('backendToken', { path: '/' });
+
     const { error } = await supabase.auth.signOut();
     if (error) {
-      return res.status(400).json({ error: error.message });
+      console.log(`Supabase logout note: ${error.message}`);
     }
+
+    console.log('Logout successful, cookie cleared');
     res.json({ message: 'Logged out successfully' });
   } catch (e) {
+    console.error('Logout error:', e);
     res.status(400).json({ error: 'Logout failed' });
   }
 });
@@ -106,13 +243,21 @@ router.get('/verify', verifySupabaseUser, async (req, res) => {
 // Get profile (protected route)
 router.get('/me', verifySupabaseUser, async (req, res) => {
   try {
-    const user = await User.findOne({ _id: req.user._id });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(user);
+    // User data is already attached by middleware
+    console.log(`GET /auth/me - User: ${req.user?.email}, has user data: ${!!req.user}`);
+    res.json({
+      id: req.user.id,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
+      location: req.user.location,
+      skills: req.user.skills,
+      phone: req.user.phone,
+      isEmailVerified: req.user.isEmailVerified
+    });
   } catch (e) {
-    res.status(400).json({ error: 'Failed to get user profile' });
+    console.error('Error in GET /auth/me:', e);
+    res.status(500).json({ error: 'Failed to get user profile' });
   }
 });
 
@@ -129,19 +274,30 @@ router.put('/me', verifySupabaseUser, async (req, res) => {
       }
     });
 
-    const user = await User.findOneAndUpdate(
-      { _id: req.user._id },
+    // Update user in MongoDB
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
       filteredUpdates,
-      { new: true }
+      { new: true, runValidators: true }
     );
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(user);
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      location: user.location,
+      skills: user.skills,
+      phone: user.phone,
+      isEmailVerified: user.isEmailVerified
+    });
   } catch (e) {
-    res.status(400).json({ error: 'Failed to update profile' });
+    console.error('Profile update error:', e);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 
@@ -149,13 +305,6 @@ router.put('/me', verifySupabaseUser, async (req, res) => {
 router.post('/resend-verification', async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // For Supabase, we need to resend the confirmation email
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email
@@ -173,55 +322,104 @@ router.post('/resend-verification', async (req, res) => {
   }
 });
 
-// Create user profile in MongoDB after email verification
-router.post('/createProfile', async (req, res) => {
+// Forgot password
+router.post('/forgot-password', async (req, res) => {
   try {
-    const { supabase_id, email, name, role, location, skills, phone } = req.body;
+    const { email } = req.body;
 
-    // Check if user already exists in MongoDB
-    const existingUser = await User.findOne({ supabaseId: supabase_id });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Profile already exists' });
+    // Check if user exists in MongoDB
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
     }
 
-    // Create user profile in MongoDB
-    const user = new User({
-      supabaseId: supabase_id,
-      name,
-      email,
-      role,
-      location,
-      skills: Array.isArray(skills) ? skills : (typeof skills === 'string' ? skills.split(',').map(s => s.trim()) : []),
-      phone,
-      emailVerified: true
+    // Send reset email via Supabase
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`
     });
 
-    await user.save();
-    res.status(201).json({ message: 'Profile created successfully!', user: { id: user._id, name, email, role } });
+    if (error) {
+      console.error('Supabase reset password error:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.json({ message: 'Password reset email sent successfully' });
   } catch (e) {
-    console.error('Create profile error:', e);
-    res.status(400).json({ error: e.message || 'Failed to create profile' });
+    console.error('Forgot password error:', e);
+    res.status(500).json({ error: 'Failed to send reset email' });
   }
 });
 
-// Supabase verify endpoint for callback (deprecated, use createProfile)
-router.post('/supabase-verify', async (req, res) => {
+// Reset password
+router.post('/reset-password', async (req, res) => {
   try {
-    const { email, supabaseId } = req.body;
-    const user = await User.findOne({ email });
+    const { email, token, newPassword } = req.body;
 
-    if (user) {
-      user.emailVerified = true;
-      user.supabaseId = supabaseId;
-      await user.save();
-      return res.status(200).json({ message: 'User verified and updated' });
+    // Find user in MongoDB
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ error: 'User not found' });
     }
 
-    res.status(404).json({ message: 'User not found' });
+    // Verify token with Supabase
+    const { data: supabaseData, error: supabaseError } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'recovery'
+    });
+
+    if (supabaseError) {
+      console.error('Supabase verify OTP error:', supabaseError);
+      return res.status(400).json({ error: supabaseError.message });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password in MongoDB
+    user.password = hashedPassword;
+    await user.save();
+
+    // Update password in Supabase using admin API
+    const { error: updateError } = await supabase.auth.admin.updateUserById(user.supabaseId, {
+      password: newPassword
+    });
+
+    if (updateError) {
+      console.error('Supabase update password error:', updateError);
+      // Don't fail the request if Supabase update fails, as MongoDB is updated
+    }
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (e) {
+    console.error('Reset password error:', e);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Get user by ID (for applicants modal)
+router.get('/user/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('name email profilePicture skills location phone');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      skills: user.skills,
+      location: user.location,
+      phone: user.phone
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error fetching user by ID:', err);
+    res.status(500).json({ error: 'Failed to fetch user' });
   }
 });
 
 module.exports = router;
+

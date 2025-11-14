@@ -3,21 +3,33 @@ import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axiosInstance from '../utils/axios';
 import ShareInvite from '../components/ShareInvite';
+import ChatModal from '../components/chat/ChatModal';
+import ApplicantsModal from '../components/ApplicantsModal';
+import UserNavbar from '../components/UserNavbar';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatTaskId, setChatTaskId] = useState(null);
+  const [applicantsModalOpen, setApplicantsModalOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [userRes, tasksRes] = await Promise.all([
-          axiosInstance.get('/auth/me'),
-          axiosInstance.get('/tasks')
-        ]);
+        const userRes = await axiosInstance.get('/auth/me');
         setUser(userRes.data);
-        setTasks(tasksRes.data);
+        
+        // Try to fetch tasks, but don't fail if endpoint doesn't exist
+        try {
+          const tasksRes = await axiosInstance.get('/tasks');
+          setTasks(tasksRes.data);
+        } catch (tasksErr) {
+          console.warn('Tasks endpoint not available:', tasksErr.response?.status);
+          setTasks([]);
+        }
       } catch (err) {
         // Error handling is now done by axios interceptor
         console.error('Dashboard data fetch error:', err);
@@ -26,12 +38,7 @@ const Dashboard = () => {
       }
     };
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      window.location.href = '/login';
-      return;
-    }
-    
+    // Rely on the backend cookie auth; fetch data and let axios interceptor handle unauthenticated errors
     fetchData();
   }, []);
 
@@ -42,20 +49,34 @@ const Dashboard = () => {
       setTasks(tasksRes.data);
       toast.success('Task accepted successfully!');
     } catch (err) {
-      // Error toast is handled by axios interceptor
       console.error('Accept task error:', err);
+      toast.error('Failed to accept task');
     }
   };
 
   const markTaskComplete = async (id) => {
     try {
-      await axiosInstance.patch(`/tasks/${id}/complete`);
+      await axiosInstance.patch(`/tasks/${id}/complete-client`);
       const tasksRes = await axiosInstance.get('/tasks');
       setTasks(tasksRes.data);
       toast.success('Task marked as complete!');
     } catch (err) {
-      // Error toast is handled by axios interceptor
       console.error('Complete task error:', err);
+      toast.error('Failed to mark task as complete');
+    }
+  };
+
+  const handleViewApplicants = (taskId) => {
+    setSelectedTaskId(taskId);
+    setApplicantsModalOpen(true);
+  };
+
+  const handleTaskUpdate = async () => {
+    try {
+      const tasksRes = await axiosInstance.get('/tasks');
+      setTasks(tasksRes.data);
+    } catch (err) {
+      console.error('Error refreshing tasks:', err);
     }
   };
 
@@ -76,7 +97,9 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="container mx-auto p-8">
+    <>
+      <UserNavbar user={user} setUser={setUser} />
+      <div className="container mx-auto p-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800">
           {user.role === 'client' ? 'My Posted Tasks' : 'Available Tasks'}
@@ -100,7 +123,11 @@ const Dashboard = () => {
         <div>
           <h2 className="text-xl font-semibold mb-4 text-gray-700">Active Tasks</h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {tasks.filter(t => t.client && t.client._id === user._id).map(task => (
+            {tasks.filter(t => {
+              const clientId = (t.client && (t.client._id || t.client.id || t.client))?.toString?.() || '';
+              const currentUserId = (user && (user.id || user._id))?.toString?.() || '';
+              return t.client && clientId === currentUserId;
+            }).map(task => (
               <div key={task._id} className="bg-white shadow-lg rounded-xl p-6 border border-gray-100">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-semibold text-gray-800">{task.title}</h3>
@@ -143,10 +170,16 @@ const Dashboard = () => {
 
                 <div className="flex justify-end">
                   {task.status === 'open' && (
-                    <button className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition duration-300">
+                    <button
+                      onClick={() => handleViewApplicants(task._id)}
+                      className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
+                    >
                       View Applicants
                     </button>
                   )}
+                  <button onClick={() => { setChatTaskId(task._id); setChatOpen(true); }} className="ml-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-300">
+                    Open Chat
+                  </button>
                   {task.status === 'assigned' && (
                     <button 
                       onClick={() => markTaskComplete(task._id)}
@@ -176,12 +209,33 @@ const Dashboard = () => {
                 <p className="text-sm text-gray-500 mb-1"><strong>Price:</strong> KSh {task.price}</p>
                 <p className="text-sm text-gray-500 mb-4"><strong>Skills:</strong> {task.skills.join(', ')}</p>
                 <button className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" onClick={() => acceptTask(task._id)}>Accept Task</button>
+                <button onClick={() => { setChatTaskId(task._id); setChatOpen(true); }} className="ml-3 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition duration-300">Open Chat</button>
               </div>
             ))}
           </div>
         </div>
       )}
+      {chatOpen && (
+        <ChatModal
+          open={chatOpen}
+          onClose={() => setChatOpen(false)}
+          taskId={chatTaskId}
+          currentUserMongoId={user?.id || user?._id}
+          currentUserName={user?.name}
+          currentUserAvatar={user?.profilePicture}
+          currentUser={user}
+        />
+      )}
+      {applicantsModalOpen && (
+        <ApplicantsModal
+          open={applicantsModalOpen}
+          onClose={() => setApplicantsModalOpen(false)}
+          taskId={selectedTaskId}
+          onTaskUpdate={handleTaskUpdate}
+        />
+      )}
     </div>
+    </>
   );
 };
 

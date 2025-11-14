@@ -1,9 +1,16 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 dotenv.config();
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/kazilink')
+.then(() => console.log('MongoDB connected successfully'))
+.catch(err => console.error('MongoDB connection error:', err));
+
+const cookieParser = require('cookie-parser');
 
 const app = express();
 app.use(cors({
@@ -11,14 +18,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://kush_man:DOFCKYDCUvSc852U@service23.67pnkel.mongodb.net/Youth_services', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected'))
-.catch(err => console.log(err));
+app.use(cookieParser());
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -34,7 +34,8 @@ app.get('/', (req, res) => {
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
-app.use('/api/admin', require('./routes/admin'));
+app.use('/api/chatsync', require('./routes/chatSync'));
+// app.use('/api/admin', require('./routes/admin'));
 
 // Update available routes list
 console.log('Available routes:');
@@ -46,7 +47,17 @@ console.log('- GET    /api/auth/verify');
 console.log('- GET    /api/auth/me');
 console.log('- PUT    /api/auth/me');
 console.log('- POST   /api/auth/resend-verification');
-console.log('- POST   /api/auth/supabase-verify');
+console.log('- GET    /api/auth/user/:id (get user by ID)');
+console.log('- POST   /api/tasks (create task)');
+console.log('- GET    /api/tasks (list tasks)');
+console.log('- GET    /api/tasks/:id (get task)');
+console.log('- PATCH  /api/tasks/:id (update task)');
+console.log('- PATCH  /api/tasks/:id/accept (apply for task)');
+console.log('- PATCH  /api/tasks/:id/accept-applicant (accept applicant)');
+console.log('- PATCH  /api/tasks/:id/assign/:userId (assign task)');
+console.log('- PATCH  /api/tasks/:id/complete (mark complete)');
+console.log('- PATCH  /api/tasks/:id/complete-client (mark complete by client)');
+console.log('- DELETE /api/tasks/:id (delete task)');
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -61,14 +72,9 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Access at http://localhost:${PORT}`);
   console.log('Available routes:');
   console.log('- GET    /');
-  console.log('- POST   /api/auth/register');
-  console.log('- POST   /api/auth/login');
-  console.log('- POST   /api/auth/logout');
-  console.log('- GET    /api/auth/me');
-  console.log('- PUT    /api/auth/me');
-  console.log('- POST   /api/auth/resend-verification');
 });

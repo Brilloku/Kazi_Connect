@@ -32,13 +32,21 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email, password, userData) => {
+  const signUp = async (email, password, userData = {}, opts = {}) => {
+    // Allow passing an emailRedirectTo (either inside userData.emailRedirectTo or opts.emailRedirectTo)
+    const emailRedirectTo = userData.emailRedirectTo || opts.emailRedirectTo;
+
+    // Remove emailRedirectTo from metadata before sending to Supabase
+    const metadata = { ...userData };
+    if (metadata.emailRedirectTo) delete metadata.emailRedirectTo;
+
+    const options = { data: metadata };
+    if (emailRedirectTo) options.emailRedirectTo = emailRedirectTo;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: userData
-      }
+      options
     });
     return { data, error };
   };

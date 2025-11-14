@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axiosInstance from '../utils/axios';
+import UserNavbar from '../components/UserNavbar';
 
 const PostTask = () => {
   const navigate = useNavigate();
@@ -47,8 +48,8 @@ const PostTask = () => {
       toast.success('Task posted successfully!');
       navigate('/dashboard');
     } catch (err) {
-      // Error toast is handled by axios interceptor
       console.error('Task post error:', err);
+      toast.error(err.response?.data?.error || 'Failed to post task');
     }
   };
 
@@ -61,7 +62,9 @@ const PostTask = () => {
   }
 
   return (
-    <div className="container mx-auto p-8">
+    <>
+      <UserNavbar user={null} setUser={() => {}} />
+      <div className="container mx-auto p-8">
       <h2 className="text-2xl font-bold mb-4">Post a Task</h2>
       <form onSubmit={handleSubmit} className="max-w-lg mx-auto bg-white shadow-lg rounded-lg p-6 border">
         <div className="mb-4">
@@ -87,6 +90,7 @@ const PostTask = () => {
         <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300">Post Task</button>
       </form>
     </div>
+    </>
   );
 };
 

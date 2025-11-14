@@ -1,6 +1,6 @@
-now# Kenyan Youth Services Platform
+# KaziLink - Kenyan Youth Services Platform
 
-A web platform connecting Kenyan youths with service opportunities and clients seeking skilled workers. Built with MERN stack (MongoDB, Express.js, React, Node.js).
+A web platform connecting Kenyan youths with service opportunities and clients seeking skilled workers. Built with a hybrid architecture using MongoDB as primary database and Supabase for email verification.
 
 ## Features
 
@@ -25,16 +25,17 @@ A web platform connecting Kenyan youths with service opportunities and clients s
 
 ## Tech Stack
 
-- **Frontend**: React + Tailwind CSS
+- **Frontend**: React + Tailwind CSS + React Router
 - **Backend**: Node.js + Express.js
-- **Database**: MongoDB
-- **Authentication**: JWT
+- **Database**: MongoDB (primary) + Supabase (email verification)
+- **Authentication**: JWT tokens with MongoDB user storage
+- **Email Verification**: Supabase Auth
 - **Payments**: M-Pesa Daraja API (planned)
 
 ## Prerequisites
 
 - Node.js (v14 or higher)
-- MongoDB (local or Atlas)
+- Supabase account
 - npm or yarn
 
 ## Installation
@@ -42,7 +43,7 @@ A web platform connecting Kenyan youths with service opportunities and clients s
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd kenyan-youth-services
+cd kazi-connect
 ```
 
 2. Install backend dependencies:
@@ -61,35 +62,44 @@ npm install
 
 ### Backend (.env)
 ```bash
-cp .env.example .env
-# Edit .env with your MongoDB URI and JWT secret
+# Supabase Configuration
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Server Configuration
+PORT=5000
+
+# Email Configuration (optional, for Resend)
+RESEND_API_KEY=your_resend_api_key
 ```
 
 ### Frontend (.env)
 ```bash
-cp .env.example .env
-# Edit .env with your API URL (for production deployment)
+# API Configuration
+REACT_APP_API_URL=http://localhost:5000/api
+
+# Supabase Configuration (if needed)
+REACT_APP_SUPABASE_URL=your_supabase_project_url
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 ## Development
 
-1. Start MongoDB locally or use MongoDB Atlas
-
-2. Start the backend server:
+1. Start the backend server:
 ```bash
 cd backend
-npm run dev  # or npm start
+npm start
 ```
 
-3. Start the frontend development server:
+2. Start the frontend development server:
 ```bash
 cd frontend
 npm start
 ```
 
 The application will be available at:
-- Frontend: https://kazi-connect-five.vercel.app
-- Backend: https://kazi-connect.onrender.com
+- Frontend: http://localhost:3000
+- Backend: http://localhost:5000
 
 ## Deployment
 
@@ -136,17 +146,21 @@ The application will be available at:
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user info
+- `POST /api/auth/register` - User registration (MongoDB + Supabase email)
+- `POST /api/auth/login` - User login with JWT tokens
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/verify` - Verify email status
+- `GET /api/auth/me` - Get current user profile
+- `PUT /api/auth/me` - Update user profile
+- `POST /api/auth/resend-verification` - Resend verification email
 
-### Tasks
+### Tasks (Planned)
 - `GET /api/tasks` - Get all tasks (filtered by user role)
 - `POST /api/tasks` - Create new task (clients only)
 - `PATCH /api/tasks/:id/accept` - Accept task (youths only)
 - `PATCH /api/tasks/:id/complete` - Mark task complete
 
-### Admin
+### Admin (Planned)
 - `GET /api/admin/users` - Get all users
 - `GET /api/admin/tasks` - Get all tasks
 - `PATCH /api/admin/users/:id/verify` - Verify user
@@ -154,28 +168,51 @@ The application will be available at:
 ## Project Structure
 
 ```
-kenyan-youth-services/
+kazi-connect/
 ├── backend/
-│   ├── models/
-│   │   ├── User.js
-│   │   └── Task.js
+│   ├── middleware/
+│   │   └── verifySupabaseUser.js
 │   ├── routes/
 │   │   ├── auth.js
-│   │   ├── tasks.js
-│   │   └── admin.js
-│   ├── middleware/
-│   │   └── auth.js
+│   │   └── (tasks.js, admin.js - planned)
+│   ├── utils/
+│   │   └── emailService.js
 │   ├── server.js
 │   ├── package.json
-│   └── .env.example
+│   └── .env
 ├── frontend/
+│   ├── public/
 │   ├── src/
 │   │   ├── components/
+│   │   │   ├── AuthBackground.js
+│   │   │   ├── LandingPage.jsx
+│   │   │   ├── Navbar.js
+│   │   │   ├── ProtectedRoute.js
+│   │   │   └── ShareInvite.js
+│   │   ├── context/
+│   │   │   └── AuthContext.js
 │   │   ├── pages/
+│   │   │   ├── Admin.js
+│   │   │   ├── AuthCallback.js
+│   │   │   ├── BrowseTasks.js
+│   │   │   ├── Dashboard.js
+│   │   │   ├── Home.js
+│   │   │   ├── Login.js
+│   │   │   ├── PostTask.js
+│   │   │   ├── Register.js
+│   │   │   ├── ResetPassword.js
+│   │   │   └── Verify.js
 │   │   ├── utils/
-│   │   └── App.js
+│   │   │   ├── axios.js
+│   │   │   └── supabase.js
+│   │   ├── App.js
+│   │   ├── App.css
+│   │   ├── index.js
+│   │   └── index.css
 │   ├── package.json
-│   └── .env.example
+│   ├── tailwind.config.js
+│   └── .env
+├── TODO.md
 └── README.md
 ```
 

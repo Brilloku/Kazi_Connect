@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
 import AuthBackground from '../components/AuthBackground';
+import PublicNavbar from '../components/PublicNavbar';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -36,7 +37,8 @@ const Register = () => {
         role: formData.role,
         location: formData.location,
         skills: formData.skills ? formData.skills.split(',').map(s => s.trim()) : [],
-        phone: formData.phone
+        phone: formData.phone,
+        password: formData.password // Store password in metadata for backend retrieval after email verification
       };
 
       // Sign up with Supabase
@@ -65,8 +67,10 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-      <AuthBackground />
+    <>
+      <PublicNavbar />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+        <AuthBackground />
       
       {/* Top Logo */}
       <div className="fixed top-4 left-4 flex items-center gap-2">
@@ -184,6 +188,7 @@ const Register = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

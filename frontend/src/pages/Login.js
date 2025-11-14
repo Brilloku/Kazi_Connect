@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
-import axiosInstance from '../utils/axios';
+import axiosInstance, { setCookie, clearAuthCookies } from '../utils/axios';
 import AuthBackground from '../components/AuthBackground';
+import PublicNavbar from '../components/PublicNavbar';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -23,38 +24,34 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await signIn(formData.email, formData.password);
+      // Login with backend first to get JWT token
+      const res = await axiosInstance.post('/auth/login', formData);
+      const { token, user } = res.data;
 
+      // Backend sets an httpOnly cookie for the JWT; no need to store token in localStorage
+
+      // Also authenticate with Supabase for email verification features
+      const { error } = await signIn(formData.email, formData.password);
       if (error) {
-        toast.error(error.message);
-        return;
+        console.warn('Supabase login warning:', error);
+        // Continue even if Supabase fails, backend auth is primary
       }
 
-      // Get or create user profile from backend
-      try {
-        const res = await axiosInstance.post('/auth/login', formData);
-        toast.success('Login successful!');
+      toast.success('Login successful!');
 
-        // Redirect based on user role
-        const { role } = res.data.user;
-        switch (role) {
-          case 'admin':
-            navigate('/admin');
-            break;
-          case 'youth':
-            navigate('/browse-tasks');
-            break;
-          case 'client':
-            navigate('/dashboard');
-            break;
-          default:
-            navigate('/dashboard');
-        }
-      } catch (backendError) {
-        console.error('Backend login error:', backendError);
-        // Even if backend fails, user is logged in with Supabase
-        toast.success('Login successful!');
-        navigate('/dashboard');
+      // Redirect based on user role
+      switch (user.role) {
+        case 'admin':
+          navigate('/admin');
+          break;
+        case 'youth':
+          navigate('/browse-tasks');
+          break;
+        case 'client':
+          navigate('/dashboard');
+          break;
+        default:
+          navigate('/dashboard');
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -68,8 +65,10 @@ const Login = () => {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-      <AuthBackground />
+    <>
+      <PublicNavbar />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+        <AuthBackground />
       
       {/* Top Logo */}
       <div className="fixed top-4 left-4 flex items-center gap-2">
@@ -129,6 +128,7 @@ const Login = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

@@ -2,32 +2,37 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { supabase } from './supabase';
 
-console.log('API URL:', process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com/api');
+// Determine API URL based on environment
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+console.log('API URL:', API_URL);
 
 const axiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com/api',
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
+  withCredentials: true, // Enable cookies
 });
 
-// Log all requests in development
-axiosInstance.interceptors.request.use(request => {
-  console.log('Starting Request:', {
-    method: request.method,
-    url: request.url,
-    baseURL: request.baseURL
-  });
-  return request;
-});
-
-// Request interceptor to add Supabase JWT token
+// Request interceptor to add backend JWT token
 axiosInstance.interceptors.request.use(
-  async (config) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      config.headers.Authorization = `Bearer ${session.access_token}`;
+  (config) => {
+    // Prefer backend cookie when available (avoid sending stale header tokens).
+    const hasCookie = typeof document !== 'undefined' && document.cookie && document.cookie.includes('backendToken=');
+    if (hasCookie) {
+      // Cookie will be sent automatically with `withCredentials: true`.
+      console.log('Request to', config.url, '- backendToken cookie present; not adding Authorization header');
+    } else {
+      // No cookie present; rely on server to reject unauthorized requests.
+      console.log('Request to', config.url, '- No backendToken cookie present; not adding Authorization header');
     }
+    
+    console.log('Starting Request:', {
+      method: config.method,
+      url: config.url,
+      hasAuth: !!config.headers.Authorization
+    });
     return config;
   },
   (error) => {
@@ -46,7 +51,9 @@ axiosInstance.interceptors.response.use(
       switch (error.response.status) {
         case 401:
         case 403:
-          // Sign out user on auth errors
+          // Clear stored cookies on auth errors
+          clearAuthCookies();
+          // Sign out from Supabase to clean up any client session state
           supabase.auth.signOut();
           // Only redirect if we're not already on the login page
           if (!window.location.pathname.includes('/login')) {
@@ -69,5 +76,31 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Utility functions for cookie management
+export const setCookie = (name, value, days = 7) => {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  const cookieString = `${name}=${value};expires=${expires.toUTCString()};path=/;Secure;SameSite=Strict`;
+  document.cookie = cookieString;
+};
+
+export const getCookie = (name) => {
+  const nameEQ = name + '=';
+  const cookies = document.cookie.split(';');
+  for (let cookie of cookies) {
+    cookie = cookie.trim();
+    if (cookie.indexOf(nameEQ) === 0) {
+      return cookie.substring(nameEQ.length);
+    }
+  }
+  return null;
+};
+
+export const clearAuthCookies = () => {
+  // Clear auth-related cookies
+  document.cookie = 'backendToken=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+  document.cookie = 'user=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+};
 
 export default axiosInstance;

@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabase";
-import axios from "axios";
+import axiosInstance from "../utils/axios";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -20,19 +20,16 @@ const AuthCallback = () => {
         const user = data.session.user;
         console.log("Verified Supabase user:", user);
 
-        // Create MongoDB user profile
-        await axios.post(
-          `${process.env.REACT_APP_API_URL}/api/auth/createProfile`,
-          {
-            supabase_id: user.id,
-            email: user.email,
-            name: user.user_metadata?.name,
-            role: user.user_metadata?.role,
-            location: user.user_metadata?.location,
-            skills: user.user_metadata?.skills,
-            phone: user.user_metadata?.phone
-          }
-        );
+        // Create MongoDB user profile (uses axiosInstance withCredentials)
+        await axiosInstance.post('/auth/createProfile', {
+          supabase_id: user.id,
+          email: user.email,
+          name: user.user_metadata?.name,
+          role: user.user_metadata?.role,
+          location: user.user_metadata?.location,
+          skills: user.user_metadata?.skills,
+          phone: user.user_metadata?.phone
+        });
 
         navigate("/dashboard");
       } catch (err) {

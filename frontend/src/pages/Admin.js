@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
+import UserNavbar from '../components/UserNavbar';
 
 const Admin = () => {
   const [users, setUsers] = useState([]);
@@ -7,27 +8,37 @@ const Admin = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const usersRes = await axios.get('http://kazi-connect.onrender.com/api/admin/users', config);
+      try {
+        // Use axiosInstance which will send cookies automatically
+        const usersRes = await axiosInstance.get('/admin/users');
         setUsers(usersRes.data);
-        const tasksRes = await axios.get('http://kazi-connect.onrender.com/api/admin/tasks', config);
+        const tasksRes = await axiosInstance.get('/admin/tasks');
         setTasks(tasksRes.data);
+      } catch (err) {
+        console.error('Error fetching admin data:', err);
+        // Admin endpoints not yet implemented; show empty lists
+        setUsers([]);
+        setTasks([]);
       }
     };
     fetchData();
   }, []);
 
   const verifyUser = async (id) => {
-    const token = localStorage.getItem('token');
-    const config = { headers: { Authorization: `Bearer ${token}` } };
-    await axios.patch(`https://kazi-connect.onrender.com/api/admin/users/${id}/verify`, {}, config);
-    window.location.reload();
+    try {
+      await axiosInstance.patch(`/admin/users/${id}/verify`);
+      // Refresh users list
+      const usersRes = await axiosInstance.get('/admin/users');
+      setUsers(usersRes.data);
+    } catch (err) {
+      console.error('Error verifying user:', err);
+    }
   };
 
   return (
-    <div className="container mx-auto p-8">
+    <>
+      <UserNavbar user={null} setUser={() => {}} />
+      <div className="container mx-auto p-8">
       <h2 className="text-2xl font-bold mb-4">Admin Panel</h2>
       <h3 className="text-xl font-bold mb-2">Users</h3>
       {users.map(user => (
@@ -43,6 +54,7 @@ const Admin = () => {
         </div>
       ))}
     </div>
+    </>
   );
 };
 

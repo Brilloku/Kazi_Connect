@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { supabase } from '../utils/supabase';
+import axiosInstance, { setCookie } from '../utils/axios';
 import { useAuth } from '../context/AuthContext';
 import AuthBackground from '../components/AuthBackground';
 
@@ -21,36 +22,33 @@ const VerifyEmail = () => {
       try {
         setMessage('Creating your profile...');
 
-        const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com'}/api/auth/createProfile`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            supabase_id: user.id,
-            email: user.email,
-            name: user.user_metadata?.name,
-            role: user.user_metadata?.role,
-            location: user.user_metadata?.location,
-            skills: user.user_metadata?.skills,
-            phone: user.user_metadata?.phone
-          })
+        const response = await axiosInstance.post('/auth/createProfile', {
+          supabase_id: user.id,
+          email: user.email,
+          name: user.user_metadata?.name,
+          role: user.user_metadata?.role,
+          location: user.user_metadata?.location,
+          skills: user.user_metadata?.skills,
+          phone: user.user_metadata?.phone,
+          password: user.user_metadata?.password // Pass original password from signup
         });
 
-        if (response.ok) {
-          const result = await response.json();
+        if (response.status === 200) {
+          const result = response.data;
           console.log('MongoDB user profile created:', result);
+
+          // Store backend token in a helper cookie for non-httpOnly reads (optional)
+          // The backend also sets an httpOnly cookie - that is the primary auth mechanism.
+          const { token, user: userData } = result;
+          if (token) {
+            setCookie('backendToken', token, 7);
+          }
+
           toast.success('Account verified successfully!');
           setMessage('Account verified successfully! Redirecting to dashboard...');
           setTimeout(() => {
             navigate('/dashboard');
           }, 2000);
-        } else {
-          console.error('Failed to create user profile:', response.status, response.statusText);
-          const errorText = await response.text();
-          console.error('Error response:', errorText);
-          setMessage('Account verification successful, but there was an issue creating your profile. Please try logging in.');
-          setTimeout(() => navigate('/login'), 3000);
         }
       } catch (err) {
         console.error('Error creating user profile:', err);
@@ -72,15 +70,13 @@ const VerifyEmail = () => {
     } else {
       // Listen for auth state changes
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log('Auth state changed in VerifyEmail:', event, session?.user?.email);
+        console.log('Auth state changed in VerifyEmail:', event, session);
 
         if (event === 'SIGNED_IN' && session?.user) {
-          if (session.user.email_confirmed_at) {
-            createProfile(session.user);
-          } else {
-            setMessage('Email verification is still pending. Please check your email and click the verification link.');
-            setIsLoading(false);
-          }
+          // Proceed to create profile when Supabase signs the user in (verification flow).
+          // Some Supabase flows sign the user in but may not expose email_confirmed_at immediately,
+          // so call createProfile regardless and let the backend upsert/update safely.
+          createProfile(session.user);
         } else if (event === 'SIGNED_OUT') {
           setMessage('Session expired. Please try logging in again.');
           setIsLoading(false);
@@ -97,10 +93,41 @@ const VerifyEmail = () => {
           return;
         }
 
-        if (!session) {
-          setMessage('Waiting for email verification. Please check your email and click the verification link.');
-          setIsLoading(false);
+        if (session && session.user) {
+          // If session exists, proceed to create profile (backend upserts safely)
+          console.log('Initial session in VerifyEmail:', session);
+          createProfile(session.user);
+          return;
         }
+
+        // If there's no session, check for a verification token in the URL (supabase verify link)
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (token) {
+          try {
+            setMessage('Finalizing verification...');
+            // Attempt to verify signup using Supabase verifyOtp. Some Supabase setups
+            // will accept verifyOtp with only token and type: 'signup'. If it succeeds
+            // a session/user will be returned and the onAuthStateChange handler will
+            // fire; otherwise we still attempt to continue after this call.
+            const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({ token, type: 'signup' });
+            if (verifyError) {
+              console.warn('verifyOtp error (signup):', verifyError.message || verifyError);
+            } else if (verifyData?.user) {
+              console.log('verifyOtp returned user:', verifyData.user.email);
+              if (verifyData.user.email_confirmed_at) {
+                createProfile(verifyData.user);
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('Error during verifyOtp:', e);
+          }
+        }
+
+        // No active session and no usable token verification result
+        setMessage('Waiting for email verification. Please check your email and click the verification link.');
+        setIsLoading(false);
       };
 
       checkInitialSession();

@@ -1,25 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiUser, FiSearch, FiTrendingUp, FiShield, FiMapPin, FiCreditCard, FiTarget, FiStar } from 'react-icons/fi';
+import { FiUser, FiSearch, FiTrendingUp, FiShield, FiMapPin, FiCreditCard, FiTarget } from 'react-icons/fi';
 
 const LandingPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-green-50 to-yellow-50">
-      {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white shadow-md">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to="/" className="text-2xl font-bold text-blue-600">Kazilink</Link>
-          <div className="space-x-6">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">Home</Link>
-            <Link to="/about" className="text-gray-700 hover:text-blue-600 transition-colors">About</Link>
-            <Link to="/opportunities" className="text-gray-700 hover:text-blue-600 transition-colors">Opportunities</Link>
-            <Link to="/login" className="text-gray-700 hover:text-blue-600 transition-colors">Login</Link>
-            <Link to="/register" className="bg-blue-600 text-white px-4 py-2 rounded-2xl hover:bg-blue-700 transition-colors">Register</Link>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <motion.section
         initial={{ opacity: 0, y: 50 }}
@@ -137,53 +123,15 @@ const LandingPage = () => {
         className="bg-gray-100 py-20"
       >
         <div className="container mx-auto px-4">
-          <h2 className="text-4xl font-bold text-center text-gray-800 mb-12">What Our Users Say</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <motion.div
-              whileHover={{ y: -10 }}
-              className="bg-white p-8 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold mr-4">J</div>
-                <div>
-                  <h4 className="font-semibold text-gray-800">Jane Doe</h4>
-                  <div className="flex text-yellow-400">
-                    <FiStar /><FiStar /><FiStar /><FiStar /><FiStar />
-                  </div>
-                </div>
-              </div>
-              <p className="text-gray-600">"Kazilink helped me find my first job and build my career. Highly recommended!"</p>
-            </motion.div>
-            <motion.div
-              whileHover={{ y: -10 }}
-              className="bg-white p-8 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center text-white font-bold mr-4">M</div>
-                <div>
-                  <h4 className="font-semibold text-gray-800">Mike Johnson</h4>
-                  <div className="flex text-yellow-400">
-                    <FiStar /><FiStar /><FiStar /><FiStar /><FiStar />
-                  </div>
-                </div>
-              </div>
-              <p className="text-gray-600">"The platform is easy to use and I got connected with great opportunities quickly."</p>
-            </motion.div>
-            <motion.div
-              whileHover={{ y: -10 }}
-              className="bg-white p-8 rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center text-white font-bold mr-4">S</div>
-                <div>
-                  <h4 className="font-semibold text-gray-800">Sarah Lee</h4>
-                  <div className="flex text-yellow-400">
-                    <FiStar /><FiStar /><FiStar /><FiStar /><FiStar />
-                  </div>
-                </div>
-              </div>
-              <p className="text-gray-600">"Kazilink opened doors I never knew existed. Thank you for empowering youth!"</p>
-            </motion.div>
+          <h2 className="text-4xl font-bold text-center text-gray-800 mb-12">Join Our Community</h2>
+          <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-md text-center">
+            <p className="text-xl text-gray-600 mb-6">
+              Thousands of young Kenyans are already using Kazilink to find opportunities and build their careers. 
+              Be part of this growing community and unlock your potential today.
+            </p>
+            <Link to="/register" className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg inline-block">
+              Join Now - It's Free
+            </Link>
           </div>
         </div>
       </motion.section>

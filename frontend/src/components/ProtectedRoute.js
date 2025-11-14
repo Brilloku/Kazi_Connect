@@ -12,16 +12,19 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
   useEffect(() => {
     const verifyUser = async () => {
-      if (!authUser) {
-        setLoading(false);
-        return;
-      }
-
+      // Call backend to verify the session (cookies will be sent automatically)
       try {
+        console.log('ProtectedRoute: Calling /auth/me to verify user');
         const { data } = await axiosInstance.get('/auth/me');
+        console.log('ProtectedRoute: User verified successfully:', data);
         setUser(data);
       } catch (err) {
-        console.error('Auth verification failed:', err);
+        console.error('ProtectedRoute: Auth verification failed:', err.response?.status, err.response?.data);
+        setUser(null);
+        // Clear stored cookies on auth failure
+        // (backend httpOnly cookie will be cleared by server-side logout if implemented)
+        // Optionally clear any helper cookies
+        // clearAuthCookies();
       } finally {
         setLoading(false);
       }
@@ -40,7 +43,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     );
   }
 
-  if (!authUser || !user) {
+  // Check if user is authenticated via backend (primary method)
+  if (!user) {
+    console.log('ProtectedRoute: No user authenticated, redirecting to login');
     toast.error('Please login to continue');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
