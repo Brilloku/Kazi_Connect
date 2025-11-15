@@ -9,8 +9,8 @@ const router = express.Router();
 
 // Initialize Supabase client (for email verification only)
 const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://vblmjxagxeangahqjspv.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZibG1qeGFneGVhbmdhaHFqc3B2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjAxMzcwNiwiZXhwIjoyMDc3NTg5NzA2fQ.r4Xb5i2FpCLPe_NHWBltxVEZ6xU8ogkjbEarb8Vfrkg'
+  process.env.SUPABASE_URL || 'YOUR_SUPABASE_URL',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SUPABASE_SERVICE_ROLE_KEY'
 );
 
 // Register with MongoDB + Supabase email verification

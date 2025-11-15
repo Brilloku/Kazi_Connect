@@ -1,9 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const mongoose = require('mongoose');
-
-dotenv.config();
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/kazilink')

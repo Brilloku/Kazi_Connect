@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import { supabase } from './supabase';
 
 // Determine API URL based on environment
-const baseURL = process.env.REACT_APP_API_URL || 'https://kazi-connect.onrender.com';
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const API_URL = baseURL.endsWith('/api') ? baseURL : `${baseURL}/api`;
 console.log('API URL:', API_URL);
 
