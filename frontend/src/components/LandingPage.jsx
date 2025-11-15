@@ -165,7 +165,7 @@ const LandingPage = () => {
               <Link to="/contact" className="hover:text-blue-400 transition-colors">Contact</Link>
             </div>
             <div className="text-gray-400">
-              © 2024 Kazilink. All rights reserved.
+              © 2025 Kazilink. All rights reserved.
             </div>
           </div>
         </div>

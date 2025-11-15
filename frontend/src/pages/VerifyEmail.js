@@ -44,8 +44,10 @@ const VerifyEmail = () => {
             setCookie('backendToken', token, 7);
           }
 
-          toast.success('Account verified successfully!');
-          setMessage('Account verified successfully! Redirecting to dashboard...');
+          // Show welcome message
+          const userName = userData.name || user.user_metadata?.name || "User";
+          toast.success(`Welcome ${userName}!`);
+          setMessage(`Welcome ${userName}! Redirecting to dashboard...`);
           setTimeout(() => {
             navigate('/dashboard');
           }, 2000);

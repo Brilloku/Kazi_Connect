@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import axiosInstance from '../utils/axios';
 import ChatModal from '../components/chat/ChatModal';
 import ApplicantsModal from '../components/ApplicantsModal';
+import EditTaskModal from '../components/EditTaskModal';
 import UserNavbar from '../components/UserNavbar';
 
 const MyTasks = () => {
@@ -14,6 +15,8 @@ const MyTasks = () => {
   const [chatTaskId, setChatTaskId] = useState(null);
   const [applicantsModalOpen, setApplicantsModalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -218,12 +221,20 @@ const MyTasks = () => {
 
                     <div className="flex justify-end gap-2">
                       {task.status === 'open' && (
-                        <button
-                          onClick={() => handleViewApplicants(task._id)}
-                          className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
-                        >
-                          View Applicants ({task.applicants?.length || 0})
-                        </button>
+                        <>
+                          <button
+                            onClick={() => { setSelectedTask(task); setEditModalOpen(true); }}
+                            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition duration-300"
+                          >
+                            Edit Task
+                          </button>
+                          <button
+                            onClick={() => handleViewApplicants(task._id)}
+                            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-300"
+                          >
+                            View Applicants ({task.applicants?.length || 0})
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => { setChatTaskId(task._id); setChatOpen(true); }}
@@ -271,6 +282,15 @@ const MyTasks = () => {
             open={applicantsModalOpen}
             onClose={() => setApplicantsModalOpen(false)}
             taskId={selectedTaskId}
+            onTaskUpdate={handleTaskUpdate}
+          />
+        )}
+
+        {editModalOpen && (
+          <EditTaskModal
+            open={editModalOpen}
+            onClose={() => setEditModalOpen(false)}
+            task={selectedTask}
             onTaskUpdate={handleTaskUpdate}
           />
         )}
