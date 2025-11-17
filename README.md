@@ -40,6 +40,47 @@ A web platform connecting Kenyan youths with service opportunities and clients s
 - Supabase account
 - npm or yarn
 
+## Environment Variables Setup
+
+**Important**: Never commit `.env` files to version control. They contain sensitive information.
+
+### Backend Environment Variables
+
+Create `backend/.env` with:
+```bash
+# MongoDB Configuration
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/kazilink?retryWrites=true&w=majority
+
+# Supabase Configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# JWT Configuration
+JWT_SECRET=your_secure_jwt_secret_key
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# Email Configuration (optional, for Resend)
+RESEND_API_KEY=your_resend_api_key
+
+# Frontend URL for password reset redirects
+FRONTEND_URL=http://localhost:3000
+```
+
+### Frontend Environment Variables
+
+Create `frontend/.env` with:
+```bash
+# API Configuration
+REACT_APP_API_URL=http://localhost:5000/api
+
+# Supabase Configuration
+REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
 ## Installation
 
 1. Clone the repository:
@@ -156,6 +197,14 @@ The application will be available at:
 - `PATCH /api/tasks/:id/complete-client` - Mark task complete (client)
 - `DELETE /api/tasks/:id` - Delete task (clients only)
 
+### Admin
+- `GET /api/admin/users` - Get all users (admin only)
+- `GET /api/admin/tasks` - Get all tasks (admin only)
+- `PATCH /api/admin/users/:id/verify` - Verify user (admin only)
+- `PATCH /api/admin/users/:id/deactivate` - Deactivate user (admin only)
+- `DELETE /api/admin/tasks/:id` - Delete task (admin only)
+- `GET /api/admin/stats` - Get platform statistics (admin only)
+
 ### Chat Synchronization
 - `POST /api/chatsync/webhook` - Supabase webhook for chat messages
 
@@ -167,6 +216,7 @@ kazi-connect/
 │   ├── middleware/
 │   │   └── verifySupabaseUser.js    # JWT authentication middleware
 │   ├── routes/
+│   │   ├── admin.js                 # Admin management routes
 │   │   ├── auth.js                  # Authentication routes
 │   │   ├── tasks.js                 # Task management routes
 │   │   └── chatSync.js              # Chat webhook routes

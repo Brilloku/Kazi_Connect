@@ -47,7 +47,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', require('./routes/auth'));        // Authentication routes
 app.use('/api/tasks', require('./routes/tasks'));      // Task management routes
 app.use('/api/chatsync', require('./routes/chatSync')); // Chat synchronization routes
-// app.use('/api/admin', require('./routes/admin'));   // Admin routes (commented out)
+app.use('/api/admin', require('./routes/admin'));      // Admin routes
 
 // Log available API endpoints for development reference
 console.log('Available routes:');
@@ -70,6 +70,12 @@ console.log('- PATCH  /api/tasks/:id/assign/:userId (assign task)');
 console.log('- PATCH  /api/tasks/:id/complete (mark complete)');
 console.log('- PATCH  /api/tasks/:id/complete-client (mark complete by client)');
 console.log('- DELETE /api/tasks/:id (delete task)');
+console.log('- GET    /api/admin/users');
+console.log('- GET    /api/admin/tasks');
+console.log('- PATCH  /api/admin/users/:id/verify');
+console.log('- PATCH  /api/admin/users/:id/deactivate');
+console.log('- DELETE /api/admin/tasks/:id');
+console.log('- GET    /api/admin/stats');
 
 // Global error handling middleware
 app.use((err, req, res, next) => {
