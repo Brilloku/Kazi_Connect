@@ -1,3 +1,9 @@
+/**
+ * Authentication routes for Kazilink
+ * Handles user registration, login, email verification, and profile management
+ * Uses hybrid approach: Supabase for email verification, MongoDB for user data
+ */
+
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -7,13 +13,18 @@ const User = require('../models/User');
 
 const router = express.Router();
 
-// Initialize Supabase client (for email verification only)
+// Initialize Supabase client for email verification only
+// Uses service role key for admin operations like password updates
 const supabase = createClient(
   process.env.SUPABASE_URL || 'YOUR_SUPABASE_URL',
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SUPABASE_SERVICE_ROLE_KEY'
 );
 
-// Register with MongoDB + Supabase email verification
+/**
+ * POST /api/auth/register
+ * Register new user with Supabase email verification
+ * Creates Supabase account first, then MongoDB profile after email verification
+ */
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role = 'client' } = req.body;
@@ -52,7 +63,11 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login with MongoDB
+/**
+ * POST /api/auth/login
+ * Authenticate user with MongoDB credentials
+ * Returns JWT token for session management
+ */
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -74,6 +89,11 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(400).json({ error: 'Please verify your email before logging in' });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
@@ -81,18 +101,17 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Set secure HTTP-only cookie for token
+    // Set httpOnly cookie with the token
     res.cookie('backendToken', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      // Use 'none' in production for cross-origin requests, 'lax' in development
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    console.log(`Login successful for user: ${email}, token generated`);
-
     res.json({
+      message: 'Login successful',
+      token,
       user: {
         id: user._id,
         name: user.name,
@@ -102,8 +121,7 @@ router.post('/login', async (req, res) => {
         skills: user.skills,
         phone: user.phone,
         isEmailVerified: user.isEmailVerified
-      },
-      token
+      }
     });
   } catch (e) {
     console.error('Login error:', e);
@@ -111,176 +129,76 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Create or update profile when Supabase verification completes
-router.post('/createProfile', async (req, res) => {
-  try {
-    const { supabase_id, email, name, role = 'client', location, skills, phone, password } = req.body;
-    console.log(`createProfile called for email: ${email}, has password: ${!!password}`);
-
-    if (!email || !supabase_id) {
-      console.log(`Missing required fields: email=${email}, supabase_id=${supabase_id}`);
-      return res.status(400).json({ error: 'supabase_id and email are required' });
-    }
-
-    let hashedPassword = null;
-    if (password) {
-      // Use password provided during registration
-      const salt = await bcrypt.genSalt(10);
-      hashedPassword = await bcrypt.hash(password, salt);
-      console.log(`Using provided password for: ${email}`);
-    }
-
-    // Use findOneAndUpdate with upsert to handle duplicate calls safely
-    // Build separate $set and $setOnInsert objects to avoid setting the same
-    // path in both (which causes ConflictingUpdateOperators errors).
-    const setFields = {
-      supabaseId: supabase_id,
-      isEmailVerified: true
-    };
-
-    if (name) setFields.name = name;
-    if (location) setFields.location = location;
-    if (skills) setFields.skills = skills;
-    if (phone) setFields.phone = phone;
-    if (hashedPassword) setFields.password = hashedPassword;
-
-    // Fields that should only be set when creating a new document
-    const setOnInsert = { email, role };
-    if (!name) setOnInsert.name = 'New User';
-    if (!hashedPassword) setOnInsert.password = Math.random().toString(36).slice(-12);
-
-    const user = await User.findOneAndUpdate(
-      { email },
-      {
-        $set: setFields,
-        $setOnInsert: setOnInsert
-      },
-      {
-        upsert: true, // Create if doesn't exist
-        new: true, // Return the updated document
-        runValidators: true
-      }
-    );
-
-    console.log(`User profile upserted: ${email}, isEmailVerified: true`);
-
-    // Generate JWT token and set HTTP-only cookie
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '7d' });
-    res.cookie('backendToken', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-    console.log(`Token generated for user: ${email}`);
-
-    res.json({ user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      location: user.location,
-      skills: user.skills,
-      phone: user.phone,
-      isEmailVerified: user.isEmailVerified
-    }, token });
-  } catch (e) {
-    console.error('createProfile error:', e);
-    res.status(500).json({ error: 'Failed to create or update profile' });
-  }
+/**
+ * POST /api/auth/logout
+ * Logout user by clearing authentication cookie
+ */
+router.post('/logout', (req, res) => {
+  res.clearCookie('backendToken');
+  res.json({ message: 'Logged out successfully' });
 });
 
-// Logout
-router.post('/logout', async (req, res) => {
+/**
+ * GET /api/auth/verify
+ * Verify email using token from Supabase email link
+ */
+router.get('/verify', async (req, res) => {
   try {
-    // Clear the backendToken cookie
-    // Clear cookie by setting an expired cookie on the same path
-    res.cookie('backendToken', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      expires: new Date(0),
-      path: '/'
-    });
-
-    // Also instruct client to clear cookie explicitly
-    res.clearCookie('backendToken', { path: '/' });
-
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.log(`Supabase logout note: ${error.message}`);
+    const { token } = req.query;
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token required' });
     }
 
-    console.log('Logout successful, cookie cleared');
-    res.json({ message: 'Logged out successfully' });
-  } catch (e) {
-    console.error('Logout error:', e);
-    res.status(400).json({ error: 'Logout failed' });
-  }
-});
-
-// Verify email status
-router.get('/verify', verifySupabaseUser, async (req, res) => {
-  try {
-    // Get user from Supabase to check verification status
-    const { data: { user }, error } = await supabase.auth.getUser(req.header('Authorization').replace('Bearer ', ''));
+    // Verify token with Supabase
+    const { data, error } = await supabase.auth.verifyOtp({
+      token,
+      type: 'signup'
+    });
 
     if (error) {
+      console.error('Supabase verify error:', error);
       return res.status(400).json({ error: error.message });
     }
 
-    res.json({
-      verified: !!user.email_confirmed_at,
+    // Create MongoDB user profile after successful verification
+    const user = data.user;
+    const userData = user.user_metadata;
+
+    // Hash the password from metadata
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(userData.password, salt);
+
+    // Create MongoDB user
+    const newUser = new User({
+      name: userData.name,
       email: user.email,
-      confirmed_at: user.email_confirmed_at
+      password: hashedPassword,
+      role: userData.role || 'client',
+      location: userData.location,
+      skills: userData.skills || [],
+      phone: userData.phone,
+      isEmailVerified: true,
+      supabaseId: user.id
     });
+
+    await newUser.save();
+    console.log(`MongoDB user created: ${user.email}`);
+
+    res.json({ message: 'Email verified successfully. You can now log in.' });
   } catch (e) {
-    console.error('Verify email error:', e);
-    res.status(400).json({ error: 'Failed to verify email status' });
+    console.error('Verification error:', e);
+    res.status(500).json({ error: 'Verification failed' });
   }
 });
 
-// Get profile (protected route)
+/**
+ * GET /api/auth/me
+ * Get current authenticated user's profile
+ * Requires valid JWT token
+ */
 router.get('/me', verifySupabaseUser, async (req, res) => {
   try {
-    // User data is already attached by middleware
-    console.log(`GET /auth/me - User: ${req.user?.email}, has user data: ${!!req.user}`);
-    res.json({
-      id: req.user.id,
-      name: req.user.name,
-      email: req.user.email,
-      role: req.user.role,
-      location: req.user.location,
-      skills: req.user.skills,
-      phone: req.user.phone,
-      isEmailVerified: req.user.isEmailVerified
-    });
-  } catch (e) {
-    console.error('Error in GET /auth/me:', e);
-    res.status(500).json({ error: 'Failed to get user profile' });
-  }
-});
-
-// Update profile
-router.put('/me', verifySupabaseUser, async (req, res) => {
-  try {
-    const updates = req.body;
-    const allowedUpdates = ['name', 'location', 'skills', 'phone'];
-
-    const filteredUpdates = {};
-    Object.keys(updates).forEach(key => {
-      if (allowedUpdates.includes(key)) {
-        filteredUpdates[key] = updates[key];
-      }
-    });
-
-    // Update user in MongoDB
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      filteredUpdates,
-      { new: true, runValidators: true }
-    );
-
+    const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -293,18 +211,76 @@ router.put('/me', verifySupabaseUser, async (req, res) => {
       location: user.location,
       skills: user.skills,
       phone: user.phone,
-      isEmailVerified: user.isEmailVerified
+      bio: user.bio,
+      profilePicture: user.profilePicture,
+      isEmailVerified: user.isEmailVerified,
+      rating: user.rating,
+      completedTasks: user.completedTasks,
+      createdAt: user.createdAt
     });
-  } catch (e) {
-    console.error('Profile update error:', e);
+  } catch (err) {
+    console.error('Error fetching user profile:', err);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+/**
+ * PUT /api/auth/me
+ * Update current user's profile
+ */
+router.put('/me', verifySupabaseUser, async (req, res) => {
+  try {
+    const updates = req.body;
+    const allowedUpdates = ['name', 'location', 'skills', 'phone', 'bio'];
+
+    // Filter out disallowed fields
+    const filteredUpdates = {};
+    Object.keys(updates).forEach(key => {
+      if (allowedUpdates.includes(key)) {
+        if (key === 'skills' && typeof updates[key] === 'string') {
+          filteredUpdates[key] = updates[key].split(',').map(s => s.trim());
+        } else {
+          filteredUpdates[key] = updates[key];
+        }
+      }
+    });
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      filteredUpdates,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error('Error updating user profile:', err);
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 
-// Resend verification email
+/**
+ * POST /api/auth/resend-verification
+ * Resend email verification link
+ */
 router.post('/resend-verification', async (req, res) => {
   try {
     const { email } = req.body;
+
+    // Find user in MongoDB
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ error: 'Email already verified' });
+    }
+
+    // Resend verification email via Supabase
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email
@@ -318,22 +294,25 @@ router.post('/resend-verification', async (req, res) => {
     res.json({ message: 'Verification email sent successfully' });
   } catch (e) {
     console.error('Resend verification error:', e);
-    res.status(400).json({ error: 'Failed to resend verification email' });
+    res.status(500).json({ error: 'Failed to resend verification email' });
   }
 });
 
-// Forgot password
+/**
+ * POST /api/auth/forgot-password
+ * Send password reset email
+ */
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
 
-    // Check if user exists in MongoDB
+    // Find user in MongoDB
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: 'User not found' });
     }
 
-    // Send reset email via Supabase
+    // Send password reset email via Supabase
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`
     });
@@ -350,7 +329,10 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-// Reset password
+/**
+ * POST /api/auth/reset-password
+ * Reset password using token from email
+ */
 router.post('/reset-password', async (req, res) => {
   try {
     const { email, token, newPassword } = req.body;
@@ -398,7 +380,11 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// Get user by ID (for applicants modal)
+/**
+ * GET /api/auth/user/:id
+ * Get user by ID (for applicants modal)
+ * Returns limited user information for task applications
+ */
 router.get('/user/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('name email profilePicture skills location phone');
@@ -422,4 +408,3 @@ router.get('/user/:id', async (req, res) => {
 });
 
 module.exports = router;
-

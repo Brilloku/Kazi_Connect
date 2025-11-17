@@ -1,6 +1,6 @@
 # KaziLink - Kenyan Youth Services Platform
 
-A web platform connecting Kenyan youths with service opportunities and clients seeking skilled workers. Built with a hybrid architecture using MongoDB as primary database and Supabase for email verification.
+A web platform connecting Kenyan youths with service opportunities and clients seeking skilled workers. Built with a hybrid architecture using MongoDB as primary database and Supabase for email verification and real-time features.
 
 ## Features
 
@@ -27,14 +27,16 @@ A web platform connecting Kenyan youths with service opportunities and clients s
 
 - **Frontend**: React + Tailwind CSS + React Router
 - **Backend**: Node.js + Express.js
-- **Database**: MongoDB (primary) + Supabase (email verification)
+- **Database**: MongoDB (primary) + Supabase (email verification and real-time features)
 - **Authentication**: JWT tokens with MongoDB user storage
 - **Email Verification**: Supabase Auth
+- **Real-time**: Supabase real-time subscriptions for notifications
 - **Payments**: M-Pesa Daraja API (planned)
 
 ## Prerequisites
 
 - Node.js (v14 or higher)
+- MongoDB Atlas account or local MongoDB instance
 - Supabase account
 - npm or yarn
 
@@ -62,15 +64,25 @@ npm install
 
 ### Backend (.env)
 ```bash
+# MongoDB Configuration
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/kazilink?retryWrites=true&w=majority
+
 # Supabase Configuration
-SUPABASE_URL=your_supabase_project_url
+SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# JWT Configuration
+JWT_SECRET=your_secure_jwt_secret_key
 
 # Server Configuration
 PORT=5000
+NODE_ENV=development
 
 # Email Configuration (optional, for Resend)
 RESEND_API_KEY=your_resend_api_key
+
+# Frontend URL for password reset redirects
+FRONTEND_URL=http://localhost:3000
 ```
 
 ### Frontend (.env)
@@ -78,8 +90,8 @@ RESEND_API_KEY=your_resend_api_key
 # API Configuration
 REACT_APP_API_URL=http://localhost:5000/api
 
-# Supabase Configuration (if needed)
-REACT_APP_SUPABASE_URL=your_supabase_project_url
+# Supabase Configuration
+REACT_APP_SUPABASE_URL=https://your-project.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
@@ -101,47 +113,22 @@ The application will be available at:
 - Frontend: http://localhost:3000
 - Backend: http://localhost:5000
 
-## Deployment
-
-### Backend (Render)
-
-1. Create a new account on [Render](https://render.com)
-
-2. Connect your GitHub repository
-
-3. Create a new Web Service:
-   - **Runtime**: Node
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-
-4. Add environment variables in Render dashboard:
-   - `MONGO_URI`: Your MongoDB Atlas connection string
-   - `JWT_SECRET`: A secure random string
-   - `PORT`: 10000 (or Render's default)
-
-5. Deploy and note the service URL (e.g., `https://your-backend.onrender.com`)
-
-### Frontend (Vercel)
-
-1. Create a new account on [Vercel](https://vercel.com)
-
-2. Connect your GitHub repository
-
-3. Configure the project:
-   - **Framework Preset**: Create React App
-   - **Root Directory**: `frontend`
-
-4. Add environment variables in Vercel dashboard:
-   - `REACT_APP_API_URL`: Your Render backend URL + `/api` (e.g., `https://your-backend.onrender.com/api`)
-
-5. Deploy
+## Database Setup
 
 ### MongoDB Atlas Setup
 
 1. Create account on [MongoDB Atlas](https://www.mongodb.com/atlas)
 2. Create a new cluster
 3. Set up database user and IP whitelist
-4. Get connection string and add to backend `.env`
+4. Get connection string and add to backend `.env` as `MONGODB_URI`
+
+### Supabase Setup
+
+1. Create account on [Supabase](https://supabase.com)
+2. Create a new project
+3. Go to Settings > API to get your project URL and keys
+4. Configure authentication settings in Authentication > Settings
+5. Set up database tables using the SQL files in `supabase/` directory
 
 ## API Endpoints
 
@@ -153,17 +140,24 @@ The application will be available at:
 - `GET /api/auth/me` - Get current user profile
 - `PUT /api/auth/me` - Update user profile
 - `POST /api/auth/resend-verification` - Resend verification email
+- `POST /api/auth/forgot-password` - Send password reset email
+- `POST /api/auth/reset-password` - Reset password with token
+- `GET /api/auth/user/:id` - Get user by ID (for applicants modal)
 
-### Tasks (Planned)
+### Tasks
 - `GET /api/tasks` - Get all tasks (filtered by user role)
 - `POST /api/tasks` - Create new task (clients only)
-- `PATCH /api/tasks/:id/accept` - Accept task (youths only)
-- `PATCH /api/tasks/:id/complete` - Mark task complete
+- `GET /api/tasks/:id` - Get task by ID
+- `PATCH /api/tasks/:id` - Update task (clients only)
+- `PATCH /api/tasks/:id/accept` - Apply for task (youths only)
+- `PATCH /api/tasks/:id/accept-applicant` - Accept applicant (clients only)
+- `PATCH /api/tasks/:id/assign/:userId` - Assign task to user (admin/clients)
+- `PATCH /api/tasks/:id/complete` - Mark task complete (assigned youth)
+- `PATCH /api/tasks/:id/complete-client` - Mark task complete (client)
+- `DELETE /api/tasks/:id` - Delete task (clients only)
 
-### Admin (Planned)
-- `GET /api/admin/users` - Get all users
-- `GET /api/admin/tasks` - Get all tasks
-- `PATCH /api/admin/users/:id/verify` - Verify user
+### Chat Synchronization
+- `POST /api/chatsync/webhook` - Supabase webhook for chat messages
 
 ## Project Structure
 
@@ -171,58 +165,134 @@ The application will be available at:
 kazi-connect/
 ├── backend/
 │   ├── middleware/
-│   │   └── verifySupabaseUser.js
+│   │   └── verifySupabaseUser.js    # JWT authentication middleware
 │   ├── routes/
-│   │   ├── auth.js
-│   │   └── (tasks.js, admin.js - planned)
+│   │   ├── auth.js                  # Authentication routes
+│   │   ├── tasks.js                 # Task management routes
+│   │   └── chatSync.js              # Chat webhook routes
+│   ├── models/
+│   │   ├── User.js                  # User MongoDB schema
+│   │   ├── Task.js                  # Task MongoDB schema
+│   │   └── ChatMessage.js           # Chat message MongoDB schema
 │   ├── utils/
-│   │   └── emailService.js
-│   ├── server.js
+│   │   └── emailService.js          # Email utility functions
+│   ├── supabaseClient.js            # Supabase client configuration
+│   ├── server.js                    # Express server setup
 │   ├── package.json
-│   └── .env
+│   └── .env                         # Environment variables
 ├── frontend/
 │   ├── public/
+│   │   ├── index.html
+│   │   ├── manifest.json
+│   │   └── favicon_io/              # Favicon files
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── AuthBackground.js
-│   │   │   ├── LandingPage.jsx
-│   │   │   ├── Navbar.js
-│   │   │   ├── ProtectedRoute.js
-│   │   │   └── ShareInvite.js
+│   │   │   ├── App.js               # Main app component with routing
+│   │   │   ├── AuthBackground.js    # Authentication background component
+│   │   │   ├── LandingPage.jsx      # Landing page component
+│   │   │   ├── UserNavbar.js        # Navigation for authenticated users
+│   │   │   ├── PublicNavbar.js      # Navigation for public pages
+│   │   │   ├── ProtectedRoute.js    # Route protection component
+│   │   │   ├── ShareInvite.js       # Social sharing component
+│   │   │   ├── EditTaskModal.jsx    # Task editing modal
+│   │   │   ├── ApplicantsModal.jsx  # Task applicants modal
+│   │   │   ├── chat/
+│   │   │   │   ├── ChatModal.jsx    # Chat interface modal
+│   │   │   │   └── ChatWindow.jsx   # Chat window component
 │   │   ├── context/
-│   │   │   └── AuthContext.js
+│   │   │   ├── AuthContext.js       # Authentication state management
+│   │   │   └── RealtimeContext.js   # Real-time notifications context
 │   │   ├── pages/
-│   │   │   ├── Admin.js
-│   │   │   ├── AuthCallback.js
-│   │   │   ├── BrowseTasks.js
-│   │   │   ├── Dashboard.js
-│   │   │   ├── Home.js
-│   │   │   ├── Login.js
-│   │   │   ├── PostTask.js
-│   │   │   ├── Register.js
-│   │   │   ├── ResetPassword.js
-│   │   │   └── Verify.js
+│   │   │   ├── Home.js              # Home/landing page
+│   │   │   ├── Register.js          # User registration page
+│   │   │   ├── Login.js             # User login page
+│   │   │   ├── VerifyEmail.js       # Email verification page
+│   │   │   ├── AuthCallback.js      # Supabase auth callback page
+│   │   │   ├── ResetPassword.js     # Password reset page
+│   │   │   ├── Dashboard.js         # User dashboard
+│   │   │   ├── MyTasks.js           # Client task management
+│   │   │   ├── PostTask.js          # Task creation page
+│   │   │   ├── BrowseTasks.js       # Youth task browsing
+│   │   │   ├── Admin.js             # Admin panel
+│   │   │   ├── Profile.js           # User profile page
+│   │   │   └── Verify.js            # Account verification page
 │   │   ├── utils/
-│   │   │   ├── axios.js
-│   │   │   └── supabase.js
-│   │   ├── App.js
+│   │   │   ├── axios.js             # HTTP client configuration
+│   │   │   ├── supabase.js          # Supabase client setup
+│   │   │   └── realtime.js          # Real-time subscription utilities
 │   │   ├── App.css
 │   │   ├── index.js
 │   │   └── index.css
 │   ├── package.json
 │   ├── tailwind.config.js
-│   └── .env
-├── TODO.md
-└── README.md
+│   └── .env                         # Frontend environment variables
+├── supabase/
+│   ├── create_chat_tables.sql       # Chat database schema
+│   ├── chat_rls_policies.sql        # Row Level Security policies
+│   ├── realtime_events.sql          # Real-time events table
+│   ├── add_sender_fields_to_chat_messages.sql
+│   └── README-realtime.md           # Real-time setup guide
+├── .gitignore                       # Git ignore rules
+├── package.json                     # Root package configuration
+├── README.md                        # This file
+└── TODO.md                          # Project task list
 ```
+
+## Security Notes
+
+- JWT tokens are stored in httpOnly cookies for security
+- Passwords are hashed using bcrypt with salt rounds
+- Supabase service role keys are used server-side only
+- Environment variables contain sensitive configuration
+- Row Level Security (RLS) policies protect Supabase data
+- CORS is configured to allow specific origins only
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Test thoroughly
-5. Submit a pull request
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+## Testing
+
+Run tests for both frontend and backend:
+
+```bash
+# Backend tests
+cd backend
+npm test
+
+# Frontend tests
+cd ../frontend
+npm test
+```
+
+## Deployment
+
+### Backend (Render)
+
+1. Create a new account on [Render](https://render.com)
+2. Connect your GitHub repository
+3. Create a new Web Service:
+   - **Runtime**: Node
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+4. Add environment variables in Render dashboard
+5. Deploy
+
+### Frontend (Vercel)
+
+1. Create account on [Vercel](https://vercel.com)
+2. Connect GitHub repository
+3. Configure build settings:
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `build`
+4. Add environment variables
+5. Deploy
 
 ## License
 

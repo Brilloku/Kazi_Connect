@@ -1,8 +1,15 @@
+/**
+ * Real-time Context for Kazilink
+ * Manages real-time notifications and events from Supabase
+ * Handles toast notifications and unread count tracking
+ */
+
 import React, { createContext, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useAuth } from './AuthContext';
 import { subscribeToRealtimeEvents, unsubscribeRealtime } from '../utils/realtime';
 
+// Default context value
 export const RealtimeContext = createContext({
   events: [],
   unreadCount: 0,
@@ -11,30 +18,36 @@ export const RealtimeContext = createContext({
 
 export const RealtimeProvider = ({ children }) => {
   const { user } = useAuth();
-  const [events, setEvents] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [events, setEvents] = useState([]);      // Array of real-time events
+  const [unreadCount, setUnreadCount] = useState(0); // Number of unread notifications
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!user) {
-      // cleanup when logged out
+      // Clean up state when user logs out
       setEvents([]);
       setUnreadCount(0);
       return;
     }
 
-    // subscribe for this user
+    /**
+     * Subscribe to real-time events for the current user
+     * Sets up Supabase subscription and event handler
+     */
     const ch = subscribeToRealtimeEvents(user._id, (record) => {
+      // Add new event to the beginning of events array (keep max 50)
       setEvents(prev => [record, ...prev].slice(0, 50));
+
+      // Increment unread count
       setUnreadCount(c => c + 1);
-      // show a toast notification
+
+      // Show toast notification based on event type
       try {
         const type = record.type || 'notification';
         if (type === 'chat:new-message') {
-          // Special handling for chat messages - only show if relevant to current user
-          // For now, show all chat notifications (can be filtered later based on task ownership)
+          // Special handling for chat messages
           toast.info(`Chat: ${record.payload?.message || 'New message'}`);
         } else {
+          // Format task-related notifications
           const title = type.replace('task:', '').replace('-', ' ');
           toast.info(`${title}: ${record.payload?.message || 'You have a new event'}`);
         }
@@ -43,15 +56,21 @@ export const RealtimeProvider = ({ children }) => {
       }
     });
 
+    // Cleanup subscription on unmount or user change
     return () => {
       if (ch) unsubscribeRealtime(ch);
     };
   }, [user]);
 
+  /**
+   * Mark all notifications as read
+   * Resets the unread count to zero
+   */
   const markAllRead = () => {
     setUnreadCount(0);
   };
 
+  // Memoize context value to prevent unnecessary re-renders
   const value = useMemo(() => ({ events, unreadCount, markAllRead }), [events, unreadCount]);
 
   return (

@@ -1,3 +1,9 @@
+/**
+ * Task management routes for Kazilink
+ * Handles CRUD operations for tasks, applications, and assignments
+ * Includes real-time notifications via Supabase
+ */
+
 const express = require('express');
 const { verifySupabaseUser } = require('../middleware/verifySupabaseUser');
 const Task = require('../models/Task');
@@ -6,11 +12,15 @@ const supabase = require('../supabaseClient');
 
 const router = express.Router();
 
-// POST - Create a new task (clients only)
+/**
+ * POST /api/tasks
+ * Create a new task (clients only)
+ * Publishes real-time event for task creation
+ */
 router.post('/', verifySupabaseUser, async (req, res) => {
   try {
     const { title, description, price, location, skills } = req.body;
-    
+
     // Verify user is a client
     if (req.user.role !== 'client') {
       return res.status(403).json({ error: 'Only clients can post tasks' });
@@ -59,7 +69,11 @@ router.post('/', verifySupabaseUser, async (req, res) => {
   }
 });
 
-// GET - Get all tasks (with optional filters)
+/**
+ * GET /api/tasks
+ * Get all tasks (with optional filters)
+ * Populates client and assigned user information
+ */
 router.get('/', async (req, res) => {
   try {
     const { status, clientId } = req.query;
@@ -85,13 +99,16 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET - Get task by ID
+/**
+ * GET /api/tasks/:id
+ * Get a specific task by ID
+ */
 router.get('/:id', async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
       .populate('client', 'name email location skills phone')
       .populate('assignedTo', 'name email location skills phone')
-      .populate('applicants', 'name email location skills phone');
+      .populate('applicants', 'name email skills location phone');
 
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
@@ -104,11 +121,14 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PATCH - Update task (client only)
+/**
+ * PATCH /api/tasks/:id
+ * Update task details (client only)
+ */
 router.patch('/:id', verifySupabaseUser, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
-    
+
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -118,19 +138,27 @@ router.patch('/:id', verifySupabaseUser, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to update this task' });
     }
 
-    const { title, description, price, location, skills, status } = req.body;
-    
-    if (title) task.title = title;
-    if (description) task.description = description;
-    if (price) task.price = price;
-    if (location) task.location = location;
-    if (skills) task.skills = skills;
-    if (status) task.status = status;
-    
+    // Can only update if not assigned
+    if (task.status !== 'open') {
+      return res.status(400).json({ error: 'Cannot update a task that is already assigned or completed' });
+    }
+
+    const updates = req.body;
+    const allowedUpdates = ['title', 'description', 'price', 'location', 'skills'];
+
+    // Filter allowed updates
+    const filteredUpdates = {};
+    Object.keys(updates).forEach(key => {
+      if (allowedUpdates.includes(key)) {
+        filteredUpdates[key] = updates[key];
+      }
+    });
+
+    Object.assign(task, filteredUpdates);
     task.updatedAt = new Date();
     await task.save();
 
-    console.log(`Task updated: ${task._id}`);
+    console.log(`Task ${task._id} updated`);
     res.json(task);
   } catch (err) {
     console.error('Error updating task:', err);
@@ -138,36 +166,46 @@ router.patch('/:id', verifySupabaseUser, async (req, res) => {
   }
 });
 
-// PATCH - Accept/Apply for a task (youth only)
+/**
+ * PATCH /api/tasks/:id/accept
+ * Apply for a task (youth only)
+ * Adds user to task applicants array
+ */
 router.patch('/:id/accept', verifySupabaseUser, async (req, res) => {
   try {
-    const task = await Task.findById(req.params.id);
-    
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
     // Verify user is youth
     if (req.user.role !== 'youth') {
       return res.status(403).json({ error: 'Only youth can apply for tasks' });
     }
 
-    // Check if already applied
+    const task = await Task.findById(req.params.id);
+
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Check if task is still open
+    if (task.status !== 'open') {
+      return res.status(400).json({ error: 'Task is no longer available' });
+    }
+
+    // Check if user already applied
     if (task.applicants.includes(req.user.id)) {
       return res.status(400).json({ error: 'You have already applied for this task' });
     }
 
-    // Add to applicants list
+    // Add user to applicants
     task.applicants.push(req.user.id);
     await task.save();
 
     console.log(`User ${req.user.email} applied for task ${task._id}`);
-    // Notify task owner (client) that someone applied
+
+    // Publish realtime event
     (async () => {
       try {
         await supabase.from('realtime_events').insert([{
           type: 'task:applied',
-          payload: { message: `${req.user.name} applied to your task`, applicantId: req.user.id, applicantName: req.user.name },
+          payload: { message: `${req.user.name} applied for your task`, taskTitle: task.title },
           task_id: String(task._id),
           target_user_id: String(task.client)
         }]);
@@ -175,17 +213,27 @@ router.patch('/:id/accept', verifySupabaseUser, async (req, res) => {
         console.warn('Failed to publish task:applied event to Supabase', e.message || e);
       }
     })();
-    res.json({ message: 'Application submitted successfully', task });
+
+    res.json({ message: 'Successfully applied for task' });
   } catch (err) {
     console.error('Error applying for task:', err);
     res.status(500).json({ error: 'Failed to apply for task' });
   }
 });
 
-// PATCH - Accept applicant for task (client only) - new endpoint for frontend modal
+/**
+ * PATCH /api/tasks/:id/accept-applicant
+ * Accept an applicant for the task (client only)
+ * Assigns the task to the selected youth
+ */
 router.patch('/:id/accept-applicant', verifySupabaseUser, async (req, res) => {
   try {
     const { applicantId } = req.body;
+
+    if (!applicantId) {
+      return res.status(400).json({ error: 'Applicant ID required' });
+    }
+
     const task = await Task.findById(req.params.id);
 
     if (!task) {
@@ -197,27 +245,30 @@ router.patch('/:id/accept-applicant', verifySupabaseUser, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to accept applicants for this task' });
     }
 
-    // Check if user is in applicants
-    if (!task.applicants.includes(applicantId)) {
-      return res.status(400).json({ error: 'User has not applied for this task' });
+    // Check if task is still open
+    if (task.status !== 'open') {
+      return res.status(400).json({ error: 'Task is no longer available' });
     }
 
-    // Assign the task to this applicant and clear other applicants
+    // Check if applicant is in the applicants list
+    if (!task.applicants.includes(applicantId)) {
+      return res.status(400).json({ error: 'Applicant not found for this task' });
+    }
+
+    // Assign the task
     task.assignedTo = applicantId;
     task.status = 'assigned';
-    task.applicants = []; // Clear all applicants since task is now assigned
     task.updatedAt = new Date();
     await task.save();
 
-    console.log(`Task ${task._id} assigned to applicant ${applicantId}`);
-    // Notify the assigned user that they were assigned
+    console.log(`Task ${task._id} assigned to user ${applicantId}`);
+
+    // Publish realtime event
     (async () => {
       try {
-        // try to get assigned user's name
-        const assignedUser = await User.findById(applicantId).select('name');
         await supabase.from('realtime_events').insert([{
           type: 'task:assigned',
-          payload: { message: `You were assigned to task ${task.title}`, assignedTo: applicantId, assignedName: assignedUser?.name || null },
+          payload: { message: `You were assigned to task: ${task.title}`, clientName: req.user.name },
           task_id: String(task._id),
           target_user_id: String(applicantId)
         }]);
@@ -225,6 +276,7 @@ router.patch('/:id/accept-applicant', verifySupabaseUser, async (req, res) => {
         console.warn('Failed to publish task:assigned event to Supabase', e.message || e);
       }
     })();
+
     res.json({ message: 'Applicant accepted successfully', task });
   } catch (err) {
     console.error('Error accepting applicant:', err);
@@ -232,23 +284,26 @@ router.patch('/:id/accept-applicant', verifySupabaseUser, async (req, res) => {
   }
 });
 
-// PATCH - Assign task to a youth (client only) - kept for backward compatibility
+/**
+ * PATCH /api/tasks/:id/assign/:userId
+ * Directly assign task to a user (admin function)
+ */
 router.patch('/:id/assign/:userId', verifySupabaseUser, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
+    const userToAssign = await User.findById(req.params.userId);
 
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    // Only the client who created the task can assign it
-    if (task.client.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ error: 'Not authorized to assign this task' });
+    if (!userToAssign) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if user is in applicants
-    if (!task.applicants.includes(req.params.userId)) {
-      return res.status(400).json({ error: 'User has not applied for this task' });
+    // Only admin or task client can assign
+    if (req.user.role !== 'admin' && task.client.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ error: 'Not authorized to assign this task' });
     }
 
     task.assignedTo = req.params.userId;
@@ -257,21 +312,6 @@ router.patch('/:id/assign/:userId', verifySupabaseUser, async (req, res) => {
     await task.save();
 
     console.log(`Task ${task._id} assigned to user ${req.params.userId}`);
-    // Notify the assigned user that they were assigned
-    (async () => {
-      try {
-        // try to get assigned user's name
-        const assignedUser = await User.findById(req.params.userId).select('name');
-        await supabase.from('realtime_events').insert([{
-          type: 'task:assigned',
-          payload: { message: `You were assigned to task ${task.title}`, assignedTo: req.params.userId, assignedName: assignedUser?.name || null },
-          task_id: String(task._id),
-          target_user_id: String(req.params.userId)
-        }]);
-      } catch (e) {
-        console.warn('Failed to publish task:assigned event to Supabase', e.message || e);
-      }
-    })();
     res.json({ message: 'Task assigned successfully', task });
   } catch (err) {
     console.error('Error assigning task:', err);
@@ -279,7 +319,10 @@ router.patch('/:id/assign/:userId', verifySupabaseUser, async (req, res) => {
   }
 });
 
-// PATCH - Mark task as complete (assigned user only)
+/**
+ * PATCH /api/tasks/:id/complete
+ * Mark task as completed (youth only)
+ */
 router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
@@ -288,9 +331,14 @@ router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    // Only the assigned user can mark it complete
-    if (!task.assignedTo || task.assignedTo.toString() !== req.user.id.toString()) {
+    // Only the assigned youth can mark as complete
+    if (task.assignedTo.toString() !== req.user.id.toString()) {
       return res.status(403).json({ error: 'Not authorized to complete this task' });
+    }
+
+    // Only allow completion if task is assigned
+    if (task.status !== 'assigned') {
+      return res.status(400).json({ error: 'Task must be assigned before it can be marked complete' });
     }
 
     task.status = 'completed';
@@ -298,13 +346,17 @@ router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
     task.updatedAt = new Date();
     await task.save();
 
-    console.log(`Task ${task._id} marked as complete`);
-    // Notify task owner that task was completed
+    console.log(`Task ${task._id} marked as complete by youth`);
+
+    // Update user's completed tasks count
+    await User.findByIdAndUpdate(req.user.id, { $inc: { completedTasks: 1 } });
+
+    // Notify the client that task was completed
     (async () => {
       try {
         await supabase.from('realtime_events').insert([{
           type: 'task:completed',
-          payload: { message: `Task ${task.title} was completed`, completedBy: req.user.id },
+          payload: { message: `Task ${task.title} was marked as completed by ${req.user.name}`, completedBy: req.user.id },
           task_id: String(task._id),
           target_user_id: String(task.client)
         }]);
@@ -312,6 +364,7 @@ router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
         console.warn('Failed to publish task:completed event to Supabase', e.message || e);
       }
     })();
+
     res.json({ message: 'Task marked as complete', task });
   } catch (err) {
     console.error('Error completing task:', err);
@@ -319,7 +372,10 @@ router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
   }
 });
 
-// PATCH - Mark task as complete (client only - for MyTasks page)
+/**
+ * PATCH /api/tasks/:id/complete-client
+ * Mark task as completed by client
+ */
 router.patch('/:id/complete-client', verifySupabaseUser, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
@@ -364,11 +420,15 @@ router.patch('/:id/complete-client', verifySupabaseUser, async (req, res) => {
   }
 });
 
-// DELETE - Delete task (client only)
+/**
+ * DELETE /api/tasks/:id
+ * Delete task (client only)
+ * Can only delete if task is not assigned
+ */
 router.delete('/:id', verifySupabaseUser, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
-    
+
     if (!task) {
       return res.status(404).json({ error: 'Task not found' });
     }
