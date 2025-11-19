@@ -7,6 +7,10 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+
+// Load environment variables from .env file
+dotenv.config();
 
 // Connect to MongoDB with fallback to local instance
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/kazilink')
