@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axiosInstance from '../utils/axios';
-import UserNavbar from '../components/UserNavbar';
-
 import { useAuth } from '../context/AuthContext';
 import UserNavbar from '../components/UserNavbar';
 
@@ -111,8 +109,8 @@ const Profile = () => {
               <p className="text-gray-600">{user.email}</p>
               <div className="flex items-center gap-2 mt-2">
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${user.role === 'admin' ? 'bg-red-100 text-red-800' :
-                    user.role === 'client' ? 'bg-blue-100 text-blue-800' :
-                      'bg-green-100 text-green-800'
+                  user.role === 'client' ? 'bg-blue-100 text-blue-800' :
+                    'bg-green-100 text-green-800'
                   }`}>
                   {user.role?.charAt(0).toUpperCase() + user.role?.slice(1)}
                 </span>
