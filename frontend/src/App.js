@@ -16,10 +16,6 @@ import { RealtimeProvider } from './context/RealtimeContext';
 // Import axios to register request/response interceptors (side-effect only)
 import './utils/axios';
 
-// Navigation components
-import UserNavbar from './components/UserNavbar';
-import PublicNavbar from './components/PublicNavbar';
-
 // Route protection component
 import ProtectedRoute from './components/ProtectedRoute';
 

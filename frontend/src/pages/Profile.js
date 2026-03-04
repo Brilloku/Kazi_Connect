@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axiosInstance from '../utils/axios';
 import { useAuth } from '../context/AuthContext';
 import UserNavbar from '../components/UserNavbar';
 
 const Profile = () => {
-  const navigate = useNavigate();
   const { backendUser: user, setBackendUser } = useAuth();
   const [loading, setLoading] = useState(!user);
   const [editing, setEditing] = useState(false);

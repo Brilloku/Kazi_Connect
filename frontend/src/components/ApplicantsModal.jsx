@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axiosInstance from '../utils/axios';
 import { toast } from 'react-toastify';
 
@@ -6,13 +6,7 @@ const ApplicantsModal = ({ open, onClose, taskId, onTaskUpdate }) => {
   const [applicants, setApplicants] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (open && taskId) {
-      fetchApplicants();
-    }
-  }, [open, taskId]);
-
-  const fetchApplicants = async () => {
+  const fetchApplicants = useCallback(async () => {
     setLoading(true);
     try {
       // The backend /tasks/:id endpoint already populates applicants with full details
@@ -26,7 +20,13 @@ const ApplicantsModal = ({ open, onClose, taskId, onTaskUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
+
+  useEffect(() => {
+    if (open && taskId) {
+      fetchApplicants();
+    }
+  }, [open, taskId, fetchApplicants]);
 
   const acceptApplicant = async (applicantId) => {
     try {

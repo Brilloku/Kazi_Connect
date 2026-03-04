@@ -4,6 +4,9 @@
  * Uses hybrid approach: Supabase for email verification, MongoDB for user data
  */
 
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
@@ -199,9 +202,9 @@ router.get('/verify', async (req, res) => {
       return res.status(400).json({ error: 'Verification token required' });
     }
 
-    // Verify token with Supabase
+    // Verify token with Supabase - use token_hash for email confirmation links
     const { data, error } = await supabase.auth.verifyOtp({
-      token,
+      token_hash: token,
       type: 'signup'
     });
 

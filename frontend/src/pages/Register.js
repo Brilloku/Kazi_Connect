@@ -20,7 +20,7 @@ const Register = () => {
     skills: '',
     phone: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -28,7 +28,7 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
       // Use backend registration endpoint to trigger custom logic (rate limiting, validation, PendingUser)
@@ -51,7 +51,7 @@ const Register = () => {
         toast.error(errorMessage);
       }
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -162,9 +162,10 @@ const Register = () => {
 
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors duration-200"
+              disabled={isSubmitting}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-300"
             >
-              Create Account
+              {isSubmitting ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 

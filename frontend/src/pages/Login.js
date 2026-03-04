@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../context/AuthContext';
-import axiosInstance, { setCookie, clearAuthCookies } from '../utils/axios';
+import axiosInstance from '../utils/axios';
 import AuthBackground from '../components/AuthBackground';
 import PublicNavbar from '../components/PublicNavbar';
 
@@ -13,7 +13,7 @@ const Login = () => {
     email: '',
     password: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -21,7 +21,7 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
       // Login with backend first to get JWT token
@@ -66,7 +66,7 @@ const Login = () => {
         toast.error(errorData?.error || 'Login failed');
       }
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -118,9 +118,10 @@ const Login = () => {
 
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors duration-200"
+              disabled={isSubmitting}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-300"
             >
-              Sign in
+              {isSubmitting ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
 

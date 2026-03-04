@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { supabase } from '../utils/supabase';
-import axiosInstance, { setCookie } from '../utils/axios';
+import axiosInstance from '../utils/axios';
 import { useAuth } from '../context/AuthContext';
 import AuthBackground from '../components/AuthBackground';
 
@@ -44,7 +43,10 @@ const VerifyEmail = () => {
     };
 
     // 1. Check for token in URL (standard flow from email click)
-    const token = searchParams.get('token') || new URLSearchParams(window.location.search).get('token');
+    const token = searchParams.get('token') ||
+      searchParams.get('token_hash') ||
+      new URLSearchParams(window.location.search).get('token') ||
+      new URLSearchParams(window.location.search).get('token_hash');
 
     if (token) {
       handleVerification(token);
