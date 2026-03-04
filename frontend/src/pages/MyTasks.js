@@ -5,10 +5,11 @@ import axiosInstance from '../utils/axios';
 import ChatModal from '../components/chat/ChatModal';
 import ApplicantsModal from '../components/ApplicantsModal';
 import EditTaskModal from '../components/EditTaskModal';
+import { useAuth } from '../context/AuthContext';
 import UserNavbar from '../components/UserNavbar';
 
 const MyTasks = () => {
-  const [user, setUser] = useState(null);
+  const { backendUser: user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
@@ -21,9 +22,6 @@ const MyTasks = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const userRes = await axiosInstance.get('/auth/me');
-        setUser(userRes.data);
-
         // Fetch all tasks to filter by client
         const tasksRes = await axiosInstance.get('/tasks');
         setTasks(tasksRes.data);
@@ -104,7 +102,7 @@ const MyTasks = () => {
 
   return (
     <>
-      <UserNavbar user={user} setUser={setUser} />
+      <UserNavbar />
       <div className="container mx-auto p-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800">My Posted Tasks</h1>
@@ -174,11 +172,10 @@ const MyTasks = () => {
                   <div key={task._id} className="bg-white shadow-lg rounded-xl p-6 border border-gray-100">
                     <div className="flex justify-between items-start mb-4">
                       <h3 className="text-xl font-semibold text-gray-800">{task.title}</h3>
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        task.status === 'open' ? 'bg-blue-100 text-blue-800' :
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${task.status === 'open' ? 'bg-blue-100 text-blue-800' :
                         task.status === 'assigned' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
+                          'bg-green-100 text-green-800'
+                        }`}>
                         {task.status.toUpperCase()}
                       </div>
                     </div>

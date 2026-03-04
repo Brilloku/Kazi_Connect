@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { useAuth } from '../context/AuthContext';
+import axiosInstance from '../utils/axios';
 import AuthBackground from '../components/AuthBackground';
 import PublicNavbar from '../components/PublicNavbar';
 
 const Register = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
 
   // Get role from URL parameters
   const params = new URLSearchParams(window.location.search);
@@ -32,35 +31,25 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const userData = {
-        name: formData.name,
-        role: formData.role,
-        location: formData.location,
-        skills: formData.skills ? formData.skills.split(',').map(s => s.trim()) : [],
-        phone: formData.phone,
-        password: formData.password // Store password in metadata for backend retrieval after email verification
-      };
-
-      // Sign up with Supabase
-      const { data, error } = await signUp(formData.email, formData.password, {
-        ...userData,
-        emailRedirectTo: `${window.location.origin}/verify-email`
+      // Use backend registration endpoint to trigger custom logic (rate limiting, validation, PendingUser)
+      const res = await axiosInstance.post('/auth/register', {
+        ...formData,
+        skills: formData.skills ? formData.skills.split(',').map(s => s.trim()) : []
       });
 
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      // Always expect email confirmation
-      if (data.user) {
-        toast.success('Registration successful! Please check your email to verify your account.');
+      if (res.status === 201) {
+        toast.success(res.data.message || 'Registration successful! Please check your email.');
         navigate('/verify-email');
       }
     } catch (err) {
       console.error('Registration error:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Registration failed. Please try again.';
-      toast.error(errorMessage);
+      // Handle express-validator errors
+      if (err.response?.data?.errors) {
+        err.response.data.errors.forEach(e => toast.error(e.msg));
+      } else {
+        const errorMessage = err.response?.data?.error || err.message || 'Registration failed. Please try again.';
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }

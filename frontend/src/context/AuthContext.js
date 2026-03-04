@@ -13,6 +13,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   // User state and loading state
   const [user, setUser] = useState(null);
+  const [backendUser, setBackendUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export const AuthProvider = ({ children }) => {
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
         setUser(session?.user ?? null);
+        if (!session) setBackendUser(null);
         setLoading(false);
       }
     );
@@ -48,6 +50,22 @@ export const AuthProvider = ({ children }) => {
     // Cleanup subscription on unmount
     return () => subscription.unsubscribe();
   }, []);
+
+  /**
+   * Verify session with backend and cache the profile
+   */
+  const verifySession = async (axiosInstance) => {
+    if (backendUser) return backendUser;
+
+    try {
+      const { data } = await axiosInstance.get('/auth/me');
+      setBackendUser(data);
+      return data;
+    } catch (err) {
+      setBackendUser(null);
+      return null;
+    }
+  };
 
   /**
    * Sign up new user with Supabase
@@ -61,15 +79,13 @@ export const AuthProvider = ({ children }) => {
     // Extract email redirect URL from options
     const emailRedirectTo = userData.emailRedirectTo || opts.emailRedirectTo;
 
-    // Prepare metadata (remove redirect URL from metadata)
+    // Prepare metadata
     const metadata = { ...userData };
     if (metadata.emailRedirectTo) delete metadata.emailRedirectTo;
 
-    // Set up signup options
     const options = { data: metadata };
     if (emailRedirectTo) options.emailRedirectTo = emailRedirectTo;
 
-    // Perform signup with Supabase
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -98,16 +114,20 @@ export const AuthProvider = ({ children }) => {
    */
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    setBackendUser(null);
     return { error };
   };
 
   // Context value object
   const value = {
     user,
+    backendUser,
     loading,
     signUp,
     signIn,
-    signOut
+    signOut,
+    verifySession,
+    setBackendUser
   };
 
   return (

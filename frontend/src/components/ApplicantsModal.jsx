@@ -15,26 +15,10 @@ const ApplicantsModal = ({ open, onClose, taskId, onTaskUpdate }) => {
   const fetchApplicants = async () => {
     setLoading(true);
     try {
-      // Assuming there's an endpoint to get task details including applicants
+      // The backend /tasks/:id endpoint already populates applicants with full details
       const res = await axiosInstance.get(`/tasks/${taskId}`);
       const task = res.data;
-      if (task.applicants && task.applicants.length > 0) {
-        // Fetch user details for each applicant
-        const applicantDetails = await Promise.all(
-          task.applicants.map(async (applicant) => {
-            try {
-              const userRes = await axiosInstance.get(`/auth/user/${applicant._id || applicant}`);
-              return userRes.data;
-            } catch (err) {
-              console.error(`Failed to fetch user ${applicant._id || applicant}:`, err);
-              return { _id: applicant._id || applicant, name: 'Unknown User', email: 'N/A' };
-            }
-          })
-        );
-        setApplicants(applicantDetails);
-      } else {
-        setApplicants([]);
-      }
+      setApplicants(task.applicants || []);
     } catch (err) {
       console.error('Error fetching applicants:', err);
       toast.error('Failed to load applicants');

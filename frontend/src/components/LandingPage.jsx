@@ -2,8 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FiUser, FiSearch, FiTrendingUp, FiShield, FiMapPin, FiCreditCard, FiTarget } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 
 const LandingPage = () => {
+  const { backendUser: user } = useAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-green-50 to-yellow-50">
       {/* Hero Section */}
@@ -21,12 +24,20 @@ const LandingPage = () => {
             Discover opportunities, connect with employers, and unlock your potential.
           </p>
           <div className="space-x-4">
-            <Link to="/register" className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg">
-              Get Started
-            </Link>
-            <Link to="/login" className="bg-green-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg">
-              Browse Tasks
-            </Link>
+            {user ? (
+              <Link to="/dashboard" className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg inline-block">
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link to="/register" className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg">
+                  Get Started
+                </Link>
+                <Link to="/login" className="bg-green-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-green-700 transition-all duration-300 shadow-md hover:shadow-lg">
+                  Browse Tasks
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </motion.section>
@@ -126,7 +137,7 @@ const LandingPage = () => {
           <h2 className="text-4xl font-bold text-center text-gray-800 mb-12">Join Our Community</h2>
           <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-md text-center">
             <p className="text-xl text-gray-600 mb-6">
-              Thousands of young Kenyans are already using Kazilink to find opportunities and build their careers. 
+              Thousands of young Kenyans are already using Kazilink to find opportunities and build their careers.
               Be part of this growing community and unlock your potential today.
             </p>
             <Link to="/register" className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-semibold hover:bg-blue-700 transition-all duration-300 shadow-md hover:shadow-lg inline-block">
@@ -165,7 +176,7 @@ const LandingPage = () => {
               <Link to="/contact" className="hover:text-blue-400 transition-colors">Contact</Link>
             </div>
             <div className="text-gray-400">
-              © 2025 Kazilink. All rights reserved.
+              © 2026 Kazilink. All rights reserved.
             </div>
           </div>
         </div>

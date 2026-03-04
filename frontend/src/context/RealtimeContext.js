@@ -13,17 +13,17 @@ import { subscribeToRealtimeEvents, unsubscribeRealtime } from '../utils/realtim
 export const RealtimeContext = createContext({
   events: [],
   unreadCount: 0,
-  markAllRead: () => {},
+  markAllRead: () => { },
 });
 
 export const RealtimeProvider = ({ children }) => {
-  const { user } = useAuth();
+  const { backendUser: user } = useAuth();
   const [events, setEvents] = useState([]);      // Array of real-time events
   const [unreadCount, setUnreadCount] = useState(0); // Number of unread notifications
 
   useEffect(() => {
-    if (!user) {
-      // Clean up state when user logs out
+    if (!user || !user.id) {
+      // Clean up state when user logs out or if ID is missing
       setEvents([]);
       setUnreadCount(0);
       return;
@@ -31,9 +31,9 @@ export const RealtimeProvider = ({ children }) => {
 
     /**
      * Subscribe to real-time events for the current user
-     * Sets up Supabase subscription and event handler
+     * Uses the MongoDB user ID for filtering
      */
-    const ch = subscribeToRealtimeEvents(user._id, (record) => {
+    const ch = subscribeToRealtimeEvents(user.id, (record) => {
       // Add new event to the beginning of events array (keep max 50)
       setEvents(prev => [record, ...prev].slice(0, 50));
 

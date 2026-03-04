@@ -1,64 +1,25 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import axiosInstance, { clearAuthCookies } from '../utils/axios';
-import { supabase } from '../utils/supabase';
+import axiosInstance from '../utils/axios';
+import { useAuth } from '../context/AuthContext';
 import { RealtimeContext } from '../context/RealtimeContext';
 
-const UserNavbar = ({ user, setUser }) => {
+const UserNavbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { backendUser: userData, signOut } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userData, setUserData] = useState(user);
   const { events, unreadCount, markAllRead } = useContext(RealtimeContext);
-
-  useEffect(() => {
-    setUserData(user);
-  }, [user]);
-
-  useEffect(() => {
-    if (!userData) {
-      const fetchUser = async () => {
-        try {
-          const { data } = await axiosInstance.get('/auth/me');
-          setUserData(data);
-          setUser(data);
-        } catch (err) {
-          console.error('Error fetching user:', err);
-          setUserData(null);
-          setUser(null);
-          // If not authenticated, redirect to login
-          navigate('/login');
-        }
-      };
-      fetchUser();
-    }
-  }, [userData, setUser, navigate]);
 
   const handleLogout = async () => {
     try {
       await axiosInstance.post('/auth/logout');
-      setUserData(null);
-      setUser(null);
-      // Clear any client-side cookies/session and supabase client session
-      try {
-        clearAuthCookies();
-      } catch (e) {
-        console.warn('Failed to clear client cookies', e);
-      }
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        console.warn('Supabase signOut error', e);
-      }
+      await signOut();
       toast.success('Logged out successfully');
       navigate('/login');
-      // Force a full reload so App re-checks /auth/me and switches to PublicNavbar
-      setTimeout(() => {
-        try { window.location.reload(); } catch (e) { /* ignore */ }
-      }, 200);
     } catch (err) {
       console.error('Logout error:', err);
       toast.error('Logout failed');
@@ -126,7 +87,7 @@ const UserNavbar = ({ user, setUser }) => {
                   </Link>
                 </>
               )}
-              
+
               {userData.role === 'youth' && (
                 <Link to="/browse-tasks" className={`pb-2 transition ${isActive('/browse-tasks')}`}>
                   Browse Tasks

@@ -8,7 +8,7 @@ import PublicNavbar from '../components/PublicNavbar';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, setBackendUser } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -27,6 +27,9 @@ const Login = () => {
       // Login with backend first to get JWT token
       const res = await axiosInstance.post('/auth/login', formData);
       const { user } = res.data;
+
+      // Update AuthContext with the verified backend user
+      setBackendUser(user);
 
       // Backend sets an httpOnly cookie for the JWT; no need to store token in localStorage
 
@@ -55,8 +58,13 @@ const Login = () => {
       }
     } catch (err) {
       console.error('Login error:', err);
-      const errorData = err.response?.data;
-      toast.error(errorData?.error || 'Login failed');
+      // Handle express-validator errors
+      if (err.response?.data?.errors) {
+        err.response.data.errors.forEach(e => toast.error(e.msg));
+      } else {
+        const errorData = err.response?.data;
+        toast.error(errorData?.error || 'Login failed');
+      }
     } finally {
       setIsLoading(false);
     }

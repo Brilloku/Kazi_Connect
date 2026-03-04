@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import axiosInstance from '../utils/axios';
 import UserNavbar from '../components/UserNavbar';
 
@@ -55,11 +56,13 @@ const Admin = () => {
   const verifyUser = async (id) => {
     try {
       await axiosInstance.patch(`/admin/users/${id}/verify`);
+      toast.success('User verified successfully');
       // Refresh users list after verification
       const usersRes = await axiosInstance.get('/admin/users');
       setUsers(usersRes.data);
     } catch (err) {
       console.error('Error verifying user:', err);
+      toast.error(err.response?.data?.error || 'Failed to verify user');
     }
   };
 
@@ -70,11 +73,13 @@ const Admin = () => {
   const deactivateUser = async (id) => {
     try {
       await axiosInstance.patch(`/admin/users/${id}/deactivate`);
+      toast.success('User deactivated successfully');
       // Refresh users list after deactivation
       const usersRes = await axiosInstance.get('/admin/users');
       setUsers(usersRes.data);
     } catch (err) {
       console.error('Error deactivating user:', err);
+      toast.error(err.response?.data?.error || 'Failed to deactivate user');
     }
   };
 
@@ -89,18 +94,20 @@ const Admin = () => {
 
     try {
       await axiosInstance.delete(`/admin/tasks/${id}`);
+      toast.success('Task deleted successfully');
       // Refresh tasks list after deletion
       const tasksRes = await axiosInstance.get('/admin/tasks');
       setTasks(tasksRes.data);
     } catch (err) {
       console.error('Error deleting task:', err);
+      toast.error(err.response?.data?.error || 'Failed to delete task');
     }
   };
 
   if (loading) {
     return (
       <>
-        <UserNavbar user={null} setUser={() => {}} />
+        <UserNavbar />
         <div className="container mx-auto p-8">
           <div className="text-center">Loading admin panel...</div>
         </div>
@@ -110,7 +117,7 @@ const Admin = () => {
 
   return (
     <>
-      <UserNavbar user={null} setUser={() => {}} />
+      <UserNavbar />
       <div className="container mx-auto p-8">
         <h2 className="text-3xl font-bold mb-6">Admin Panel</h2>
 
@@ -158,9 +165,8 @@ const Admin = () => {
                     <td className="px-4 py-2">{user.email}</td>
                     <td className="px-4 py-2 capitalize">{user.role}</td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        user.isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
+                      <span className={`px-2 py-1 rounded text-xs ${user.isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
                         {user.isVerified ? 'Verified' : 'Unverified'}
                       </span>
                     </td>
@@ -207,11 +213,10 @@ const Admin = () => {
                     <td className="px-4 py-2">{task.title}</td>
                     <td className="px-4 py-2">{task.client?.name || 'Unknown'}</td>
                     <td className="px-4 py-2">
-                      <span className={`px-2 py-1 rounded text-xs capitalize ${
-                        task.status === 'open' ? 'bg-green-100 text-green-800' :
+                      <span className={`px-2 py-1 rounded text-xs capitalize ${task.status === 'open' ? 'bg-green-100 text-green-800' :
                         task.status === 'assigned' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                          'bg-gray-100 text-gray-800'
+                        }`}>
                         {task.status}
                       </span>
                     </td>
