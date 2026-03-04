@@ -4,14 +4,50 @@
  * Uses hybrid approach: Supabase for email verification, MongoDB for user data
  */
 
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
+const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 const { verifySupabaseUser } = require('../middleware/verifySupabaseUser');
 const User = require('../models/User');
+const PendingUser = require('../models/PendingUser');
 
 const router = express.Router();
+
+// Rate limiter for authentication routes:
+// 10 requests per 15 minutes per IP to prevent brute-force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { error: 'Too many authentication attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Middleware to handle validation errors
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
+
+// Validation schemas
+const registerValidation = [
+  body('name').notEmpty().withMessage('Name is required').trim(),
+  body('email').isEmail().withMessage('Invalid email format').normalizeEmail(),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/\d/)
+    .withMessage('Password must contain at least one number'),
+  body('role').isIn(['client', 'youth']).withMessage('Invalid role selected')
+];
+
+const loginValidation = [
+  body('email').isEmail().withMessage('Invalid email format').normalizeEmail(),
+  body('password').notEmpty().withMessage('Password is required')
+];
 
 // Initialize Supabase client for email verification only
 // Uses service role key for admin operations like password updates
@@ -25,34 +61,44 @@ const supabase = createClient(
  * Register new user with Supabase email verification
  * Creates Supabase account first, then MongoDB profile after email verification
  */
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, registerValidation, validate, async (req, res) => {
   try {
-    const { name, email, password, role = 'client' } = req.body;
-    console.log(`Register attempt for email: ${email}`);
+    const { name, email, password, role = 'client', location, skills, phone } = req.body;
 
-    // Create Supabase account for email verification (don't create MongoDB user yet)
+    // Check if user already exists in User collection
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
+    // Hash the password for local storage (higher security factor than the previous metadata approach)
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Upsert into PendingUser (overwrite if they resubmit)
+    await PendingUser.findOneAndUpdate(
+      { email },
+      { name, email, password: hashedPassword, role, location, skills, phone },
+      { upsert: true, new: true }
+    );
+
+    console.log(`Stored pending registration for: ${email}`);
+
+    // Create Supabase account for email verification (WITHOUT the password in metadata)
     const { data: supabaseData, error: supabaseError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: {
-          name,
-          role,
-          // SECURITY WARNING: Storing plaintext password in metadata is a temporary 
-          // development workaround to allow the backend /verify route to create the 
-          // MongoDB user after email click. This should be replaced with a 
-          // PendingUser collection or custom auth provider.
-          password
-        }
+        data: { name, role }
       }
     });
 
     if (supabaseError) {
       console.log(`Supabase signup error: ${supabaseError.message}`);
+      // Clean up the pending user record if Supabase tells us it definitely failed 
+      // (though it often succeeds even if it sends an error for things like 'user already exists' for security reasons)
       return res.status(400).json({ error: supabaseError.message });
     }
-
-    console.log(`Supabase user created: ${email}, awaiting email verification`);
 
     res.status(201).json({
       message: 'User registered successfully. Please check your email for verification.',
@@ -72,10 +118,10 @@ router.post('/register', async (req, res) => {
  * Authenticate user with MongoDB credentials
  * Returns JWT token for session management
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, loginValidation, validate, async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log(`Login attempt for email: ${email}`);
+
 
     // Find user in MongoDB
     const user = await User.findOne({ email });
@@ -164,29 +210,37 @@ router.get('/verify', async (req, res) => {
       return res.status(400).json({ error: error.message });
     }
 
-    // Create MongoDB user profile after successful verification
-    const user = data.user;
-    const userData = user.user_metadata;
+    const { user } = data;
 
-    // Hash the password from metadata
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(userData.password, salt);
+    // Look up data in our secure PendingUser collection
+    const pendingData = await PendingUser.findOne({ email: user.email });
+    if (!pendingData) {
+      // Data might have expired or user clicked twice
+      const existingUser = await User.findOne({ email: user.email });
+      if (existingUser) {
+        return res.json({ message: 'Email verified successfully. You can now log in.' });
+      }
+      return res.status(404).json({ error: 'Verification metadata expired. Please sign up again.' });
+    }
 
-    // Create MongoDB user
+    // Transfer record to User collection
     const newUser = new User({
-      name: userData.name,
-      email: user.email,
-      password: hashedPassword,
-      role: userData.role || 'client',
-      location: userData.location,
-      skills: userData.skills || [],
-      phone: userData.phone,
+      name: pendingData.name,
+      email: pendingData.email,
+      password: pendingData.password, // This is already hashed
+      role: pendingData.role,
+      location: pendingData.location,
+      skills: pendingData.skills,
+      phone: pendingData.phone,
       isEmailVerified: true,
       supabaseId: user.id
     });
 
     await newUser.save();
-    console.log(`MongoDB user created: ${user.email}`);
+    console.log(`MongoDB user created from pending: ${user.email}`);
+
+    // Cleanup the pending record
+    await PendingUser.deleteOne({ _id: pendingData._id });
 
     res.json({ message: 'Email verified successfully. You can now log in.' });
   } catch (e) {
@@ -282,6 +336,11 @@ router.post('/resend-verification', async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser && existingUser.isEmailVerified) {
       return res.status(400).json({ error: 'Email already verified' });
+    }
+
+    const pendingUser = await PendingUser.findOne({ email });
+    if (!pendingUser) {
+      return res.status(404).json({ error: 'User registration data not found or expired. Please register again.' });
     }
 
     // Resend via Supabase — user may not yet exist in MongoDB (pending verification)

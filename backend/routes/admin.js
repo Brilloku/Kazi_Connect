@@ -6,10 +6,20 @@
 
 const express = require('express');
 const { verifySupabaseUser, adminAuth } = require('../middleware/verifySupabaseUser');
+const { param, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Task = require('../models/Task');
 
 const router = express.Router();
+
+// Middleware to handle validation errors
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
 
 // Apply admin authentication to all routes
 router.use(verifySupabaseUser);
@@ -60,7 +70,7 @@ router.get('/tasks', async (req, res) => {
  * Verify a user's identity (admin only)
  * Sets the user's verified status to true
  */
-router.patch('/users/:id/verify', async (req, res) => {
+router.patch('/users/:id/verify', param('id').isMongoId(), validate, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 
@@ -85,7 +95,7 @@ router.patch('/users/:id/verify', async (req, res) => {
  * Deactivate a user account (admin only)
  * Sets the user's active status to false
  */
-router.patch('/users/:id/deactivate', async (req, res) => {
+router.patch('/users/:id/deactivate', param('id').isMongoId(), validate, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 
@@ -110,7 +120,7 @@ router.patch('/users/:id/deactivate', async (req, res) => {
  * Delete any task (admin override)
  * Bypasses normal client-only deletion restrictions
  */
-router.delete('/tasks/:id', async (req, res) => {
+router.delete('/tasks/:id', param('id').isMongoId(), validate, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
 

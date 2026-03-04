@@ -6,8 +6,18 @@
 
 const express = require('express');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
 const { createClient } = require('@supabase/supabase-js');
 const ChatMessage = require('../models/ChatMessage');
+
+// Middleware to handle validation errors
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
 
 // Initialize Supabase client for webhook processing
 // Uses environment variables for secure configuration
@@ -22,7 +32,7 @@ const supabase = createClient(
  * Triggered when new chat messages are inserted into Supabase
  * Syncs messages to MongoDB for persistence and search capabilities
  */
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', validate, async (req, res) => {
   try {
     // Supabase sends payload in different formats depending on configuration
     // Handle both 'body.request.payload' and 'body.record' formats

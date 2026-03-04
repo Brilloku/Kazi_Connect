@@ -6,18 +6,46 @@
 
 const express = require('express');
 const { verifySupabaseUser } = require('../middleware/verifySupabaseUser');
+const { body, param, validationResult } = require('express-validator');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const supabase = require('../supabaseClient');
 
 const router = express.Router();
 
+// Middleware to handle validation errors
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
+
+// Validation schemas
+const taskSchema = [
+  body('title').notEmpty().withMessage('Title is required').trim().isLength({ max: 100 }),
+  body('description').notEmpty().withMessage('Description is required').trim(),
+  body('price').isNumeric().withMessage('Price must be a number').custom(v => v > 0).withMessage('Price must be positive'),
+  body('location').notEmpty().withMessage('Location is required').trim(),
+  body('skills').optional().isArray().withMessage('Skills must be an array')
+];
+
+const updateTaskSchema = [
+  param('id').isMongoId().withMessage('Invalid task ID'),
+  body('title').optional().trim().isLength({ max: 100 }),
+  body('description').optional().trim(),
+  body('price').optional().isNumeric().custom(v => v > 0),
+  body('location').optional().trim(),
+  body('skills').optional().isArray()
+];
+
 /**
  * POST /api/tasks
  * Create a new task (clients only)
  * Publishes real-time event for task creation
  */
-router.post('/', verifySupabaseUser, async (req, res) => {
+router.post('/', verifySupabaseUser, taskSchema, validate, async (req, res) => {
   try {
     const { title, description, price, location, skills } = req.body;
 
@@ -125,202 +153,220 @@ router.get('/:id', async (req, res) => {
  * PATCH /api/tasks/:id
  * Update task details (client only)
  */
-router.patch('/:id', verifySupabaseUser, async (req, res) => {
-  try {
-    const task = await Task.findById(req.params.id);
+router.patch('/:id',
+  verifySupabaseUser,
+  updateTaskSchema,
+  validate,
+  async (req, res) => {
+    try {
+      const task = await Task.findById(req.params.id);
 
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    // Only the client who created the task can update it
-    if (task.client.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ error: 'Not authorized to update this task' });
-    }
-
-    // Can only update if not assigned
-    if (task.status !== 'open') {
-      return res.status(400).json({ error: 'Cannot update a task that is already assigned or completed' });
-    }
-
-    const updates = req.body;
-    const allowedUpdates = ['title', 'description', 'price', 'location', 'skills'];
-
-    // Filter allowed updates
-    const filteredUpdates = {};
-    Object.keys(updates).forEach(key => {
-      if (allowedUpdates.includes(key)) {
-        filteredUpdates[key] = updates[key];
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
       }
-    });
 
-    Object.assign(task, filteredUpdates);
-    await task.save();
+      // Only the client who created the task can update it
+      if (task.client.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ error: 'Not authorized to update this task' });
+      }
 
-    console.log(`Task ${task._id} updated`);
-    res.json(task);
-  } catch (err) {
-    console.error('Error updating task:', err);
-    res.status(500).json({ error: 'Failed to update task' });
-  }
-});
+      // Can only update if not assigned
+      if (task.status !== 'open') {
+        return res.status(400).json({ error: 'Cannot update a task that is already assigned or completed' });
+      }
+
+      const updates = req.body;
+      const allowedUpdates = ['title', 'description', 'price', 'location', 'skills'];
+
+      // Filter allowed updates
+      const filteredUpdates = {};
+      Object.keys(updates).forEach(key => {
+        if (allowedUpdates.includes(key)) {
+          filteredUpdates[key] = updates[key];
+        }
+      });
+
+      Object.assign(task, filteredUpdates);
+      await task.save();
+
+      console.log(`Task ${task._id} updated`);
+      res.json(task);
+    } catch (err) {
+      console.error('Error updating task:', err);
+      res.status(500).json({ error: 'Failed to update task' });
+    }
+  });
 
 /**
  * PATCH /api/tasks/:id/accept
  * Apply for a task (youth only)
  * Adds user to task applicants array
  */
-router.patch('/:id/accept', verifySupabaseUser, async (req, res) => {
-  try {
-    // Verify user is youth
-    if (req.user.role !== 'youth') {
-      return res.status(403).json({ error: 'Only youth can apply for tasks' });
-    }
-
-    const task = await Task.findById(req.params.id);
-
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    // Check if task is still open
-    if (task.status !== 'open') {
-      return res.status(400).json({ error: 'Task is no longer available' });
-    }
-
-    // Check if user already applied
-    if (task.applicants.includes(req.user.id)) {
-      return res.status(400).json({ error: 'You have already applied for this task' });
-    }
-
-    // Add user to applicants
-    task.applicants.push(req.user.id);
-    await task.save();
-
-    console.log(`User ${req.user.email} applied for task ${task._id}`);
-
-    // Publish realtime event
-    (async () => {
-      try {
-        await supabase.from('realtime_events').insert([{
-          type: 'task:applied',
-          payload: { message: `${req.user.name} applied for your task`, taskTitle: task.title },
-          task_id: String(task._id),
-          target_user_id: String(task.client)
-        }]);
-      } catch (e) {
-        console.warn('Failed to publish task:applied event to Supabase', e.message || e);
+router.patch('/:id/accept',
+  verifySupabaseUser,
+  param('id').isMongoId().withMessage('Invalid task ID'),
+  validate,
+  async (req, res) => {
+    try {
+      // Verify user is youth
+      if (req.user.role !== 'youth') {
+        return res.status(403).json({ error: 'Only youth can apply for tasks' });
       }
-    })();
 
-    res.json({ message: 'Successfully applied for task' });
-  } catch (err) {
-    console.error('Error applying for task:', err);
-    res.status(500).json({ error: 'Failed to apply for task' });
-  }
-});
+      const task = await Task.findById(req.params.id);
+
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Check if task is still open
+      if (task.status !== 'open') {
+        return res.status(400).json({ error: 'Task is no longer available' });
+      }
+
+      // Check if user already applied
+      if (task.applicants.includes(req.user.id)) {
+        return res.status(400).json({ error: 'You have already applied for this task' });
+      }
+
+      // Add user to applicants
+      task.applicants.push(req.user.id);
+      await task.save();
+
+      console.log(`User ${req.user.email} applied for task ${task._id}`);
+
+      // Publish realtime event
+      (async () => {
+        try {
+          await supabase.from('realtime_events').insert([{
+            type: 'task:applied',
+            payload: { message: `${req.user.name} applied for your task`, taskTitle: task.title },
+            task_id: String(task._id),
+            target_user_id: String(task.client)
+          }]);
+        } catch (e) {
+          console.warn('Failed to publish task:applied event to Supabase', e.message || e);
+        }
+      })();
+
+      res.json({ message: 'Successfully applied for task' });
+    } catch (err) {
+      console.error('Error applying for task:', err);
+      res.status(500).json({ error: 'Failed to apply for task' });
+    }
+  });
 
 /**
  * PATCH /api/tasks/:id/accept-applicant
  * Accept an applicant for the task (client only)
  * Assigns the task to the selected youth
  */
-router.patch('/:id/accept-applicant', verifySupabaseUser, async (req, res) => {
-  try {
-    const { applicantId } = req.body;
+router.patch('/:id/accept-applicant',
+  verifySupabaseUser,
+  param('id').isMongoId().withMessage('Invalid task ID'),
+  body('applicantId').isMongoId().withMessage('Invalid applicant ID'),
+  validate,
+  async (req, res) => {
+    try {
+      const { applicantId } = req.body;
 
-    if (!applicantId) {
-      return res.status(400).json({ error: 'Applicant ID required' });
-    }
-
-    const task = await Task.findById(req.params.id);
-
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-
-    // Only the client who created the task can accept applicants
-    if (task.client.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ error: 'Not authorized to accept applicants for this task' });
-    }
-
-    // Check if task is still open
-    if (task.status !== 'open') {
-      return res.status(400).json({ error: 'Task is no longer available' });
-    }
-
-    // Check if applicant is in the applicants list
-    if (!task.applicants.includes(applicantId)) {
-      return res.status(400).json({ error: 'Applicant not found for this task' });
-    }
-
-    // Assign the task
-    task.assignedTo = applicantId;
-    task.status = 'assigned';
-    await task.save();
-
-    console.log(`Task ${task._id} assigned to user ${applicantId}`);
-
-    // Publish realtime event
-    (async () => {
-      try {
-        await supabase.from('realtime_events').insert([{
-          type: 'task:assigned',
-          payload: { message: `You were assigned to task: ${task.title}`, clientName: req.user.name },
-          task_id: String(task._id),
-          target_user_id: String(applicantId)
-        }]);
-      } catch (e) {
-        console.warn('Failed to publish task:assigned event to Supabase', e.message || e);
+      if (!applicantId) {
+        return res.status(400).json({ error: 'Applicant ID required' });
       }
-    })();
 
-    res.json({ message: 'Applicant accepted successfully', task });
-  } catch (err) {
-    console.error('Error accepting applicant:', err);
-    res.status(500).json({ error: 'Failed to accept applicant' });
-  }
-});
+      const task = await Task.findById(req.params.id);
+
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Only the client who created the task can accept applicants
+      if (task.client.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ error: 'Not authorized to accept applicants for this task' });
+      }
+
+      // Check if task is still open
+      if (task.status !== 'open') {
+        return res.status(400).json({ error: 'Task is no longer available' });
+      }
+
+      // Check if applicant is in the applicants list
+      if (!task.applicants.includes(applicantId)) {
+        return res.status(400).json({ error: 'Applicant not found for this task' });
+      }
+
+      // Assign the task
+      task.assignedTo = applicantId;
+      task.status = 'assigned';
+      await task.save();
+
+      console.log(`Task ${task._id} assigned to user ${applicantId}`);
+
+      // Publish realtime event
+      (async () => {
+        try {
+          await supabase.from('realtime_events').insert([{
+            type: 'task:assigned',
+            payload: { message: `You were assigned to task: ${task.title}`, clientName: req.user.name },
+            task_id: String(task._id),
+            target_user_id: String(applicantId)
+          }]);
+        } catch (e) {
+          console.warn('Failed to publish task:assigned event to Supabase', e.message || e);
+        }
+      })();
+
+      res.json({ message: 'Applicant accepted successfully', task });
+    } catch (err) {
+      console.error('Error accepting applicant:', err);
+      res.status(500).json({ error: 'Failed to accept applicant' });
+    }
+  });
 
 /**
  * PATCH /api/tasks/:id/assign/:userId
  * Directly assign task to a user (admin function)
  */
-router.patch('/:id/assign/:userId', verifySupabaseUser, async (req, res) => {
-  try {
-    const task = await Task.findById(req.params.id);
-    const userToAssign = await User.findById(req.params.userId);
+router.patch('/:id/assign/:userId',
+  verifySupabaseUser,
+  param('id').isMongoId(),
+  param('userId').isMongoId(),
+  validate,
+  async (req, res) => {
+    try {
+      const task = await Task.findById(req.params.id);
+      const userToAssign = await User.findById(req.params.userId);
 
-    if (!task) {
-      return res.status(404).json({ error: 'Task not found' });
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      if (!userToAssign) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Only admin or task client can assign
+      if (req.user.role !== 'admin' && task.client.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ error: 'Not authorized to assign this task' });
+      }
+
+      task.assignedTo = req.params.userId;
+      task.status = 'assigned';
+      await task.save();
+
+      console.log(`Task ${task._id} assigned to user ${req.params.userId}`);
+      res.json({ message: 'Task assigned successfully', task });
+    } catch (err) {
+      console.error('Error assigning task:', err);
+      res.status(500).json({ error: 'Failed to assign task' });
     }
-
-    if (!userToAssign) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Only admin or task client can assign
-    if (req.user.role !== 'admin' && task.client.toString() !== req.user.id.toString()) {
-      return res.status(403).json({ error: 'Not authorized to assign this task' });
-    }
-
-    task.assignedTo = req.params.userId;
-    task.status = 'assigned';
-    await task.save();
-
-    console.log(`Task ${task._id} assigned to user ${req.params.userId}`);
-    res.json({ message: 'Task assigned successfully', task });
-  } catch (err) {
-    console.error('Error assigning task:', err);
-    res.status(500).json({ error: 'Failed to assign task' });
-  }
-});
+  });
 
 /**
  * PATCH /api/tasks/:id/complete
  * Mark task as completed (youth only)
  */
-router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
+router.patch('/:id/complete', verifySupabaseUser, param('id').isMongoId(), validate, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
 
@@ -372,7 +418,7 @@ router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
  * PATCH /api/tasks/:id/complete-client
  * Mark task as completed by client
  */
-router.patch('/:id/complete-client', verifySupabaseUser, async (req, res) => {
+router.patch('/:id/complete-client', verifySupabaseUser, param('id').isMongoId(), validate, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
 
@@ -420,7 +466,7 @@ router.patch('/:id/complete-client', verifySupabaseUser, async (req, res) => {
  * Delete task (client only)
  * Can only delete if task is not assigned
  */
-router.delete('/:id', verifySupabaseUser, async (req, res) => {
+router.delete('/:id', verifySupabaseUser, param('id').isMongoId(), validate, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
 
