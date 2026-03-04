@@ -27,20 +27,10 @@ const verifySupabaseUser = async (req, res, next) => {
     }
 
     // Fallback: check httpOnly cookie for backendToken
-    // Cookies are more secure as they're not accessible via JavaScript
-    if (!token) {
-      if (req.cookies && req.cookies.backendToken) {
-        token = req.cookies.backendToken;
-        console.log(`Found token in req.cookies.backendToken`);
-      } else if (req.headers && req.headers.cookie) {
-        // Parse cookie header string if middleware isn't available
-        const cookies = req.headers.cookie.split(';').map(c => c.trim());
-        const match = cookies.find(c => c.startsWith('backendToken='));
-        if (match) {
-          token = match.split('=')[1];
-          console.log(`Found token in cookie header string`);
-        }
-      }
+    // cookie-parser middleware in server.js populates req.cookies automatically
+    if (!token && req.cookies && req.cookies.backendToken) {
+      token = req.cookies.backendToken;
+      console.log(`Found token in req.cookies.backendToken`);
     }
 
     // Return 401 if no token found
@@ -50,7 +40,7 @@ const verifySupabaseUser = async (req, res, next) => {
     }
 
     // Verify JWT token using secret key
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log(`Token verified successfully, userId: ${decoded.userId}`);
 
     // Fetch user from MongoDB to ensure they still exist

@@ -59,7 +59,8 @@ const userSchema = new mongoose.Schema({
   // Link to Supabase auth user
   supabaseId: {
     type: String,
-    sparse: true // Allows null values but ensures uniqueness when present
+    sparse: true, // Allows null values but ensures uniqueness when present
+    unique: true
   },
 
   // Profile customization

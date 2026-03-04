@@ -11,7 +11,7 @@ import { supabase } from './supabase';
 // Determine API base URL from environment variables
 const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const API_URL = baseURL.endsWith('/api') ? baseURL : `${baseURL}/api`;
-console.log('API URL:', API_URL);
+if (process.env.NODE_ENV !== 'production') console.log('API URL:', API_URL);
 
 // Create axios instance with default configuration
 const axiosInstance = axios.create({
@@ -29,23 +29,19 @@ const axiosInstance = axios.create({
  */
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Check if backendToken cookie is present
-    const hasCookie = typeof document !== 'undefined' && document.cookie && document.cookie.includes('backendToken=');
-
-    if (hasCookie) {
-      // Cookie will be sent automatically with `withCredentials: true`
-      console.log('Request to', config.url, '- backendToken cookie present; not adding Authorization header');
-    } else {
-      // No cookie present; server will handle unauthorized requests
-      console.log('Request to', config.url, '- No backendToken cookie present; not adding Authorization header');
+    if (process.env.NODE_ENV !== 'production') {
+      // Check if backendToken cookie is present
+      const hasCookie = typeof document !== 'undefined' && document.cookie && document.cookie.includes('backendToken=');
+      console.log(
+        'Request to', config.url,
+        hasCookie ? '- backendToken cookie present' : '- No backendToken cookie present'
+      );
+      console.log('Starting Request:', {
+        method: config.method,
+        url: config.url,
+        hasAuth: !!config.headers.Authorization
+      });
     }
-
-    // Log request details for debugging
-    console.log('Starting Request:', {
-      method: config.method,
-      url: config.url,
-      hasAuth: !!config.headers.Authorization
-    });
     return config;
   },
   (error) => {

@@ -155,7 +155,6 @@ router.patch('/:id', verifySupabaseUser, async (req, res) => {
     });
 
     Object.assign(task, filteredUpdates);
-    task.updatedAt = new Date();
     await task.save();
 
     console.log(`Task ${task._id} updated`);
@@ -258,7 +257,6 @@ router.patch('/:id/accept-applicant', verifySupabaseUser, async (req, res) => {
     // Assign the task
     task.assignedTo = applicantId;
     task.status = 'assigned';
-    task.updatedAt = new Date();
     await task.save();
 
     console.log(`Task ${task._id} assigned to user ${applicantId}`);
@@ -308,7 +306,6 @@ router.patch('/:id/assign/:userId', verifySupabaseUser, async (req, res) => {
 
     task.assignedTo = req.params.userId;
     task.status = 'assigned';
-    task.updatedAt = new Date();
     await task.save();
 
     console.log(`Task ${task._id} assigned to user ${req.params.userId}`);
@@ -332,7 +329,7 @@ router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
     }
 
     // Only the assigned youth can mark as complete
-    if (task.assignedTo.toString() !== req.user.id.toString()) {
+    if (!task.assignedTo || task.assignedTo.toString() !== req.user.id.toString()) {
       return res.status(403).json({ error: 'Not authorized to complete this task' });
     }
 
@@ -343,7 +340,6 @@ router.patch('/:id/complete', verifySupabaseUser, async (req, res) => {
 
     task.status = 'completed';
     task.completedAt = new Date();
-    task.updatedAt = new Date();
     await task.save();
 
     console.log(`Task ${task._id} marked as complete by youth`);
@@ -396,7 +392,6 @@ router.patch('/:id/complete-client', verifySupabaseUser, async (req, res) => {
 
     task.status = 'completed';
     task.completedAt = new Date();
-    task.updatedAt = new Date();
     await task.save();
 
     console.log(`Task ${task._id} marked as complete by client`);

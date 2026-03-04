@@ -16,8 +16,8 @@ const router = express.Router();
 // Initialize Supabase client for email verification only
 // Uses service role key for admin operations like password updates
 const supabase = createClient(
-  process.env.SUPABASE_URL || 'YOUR_SUPABASE_URL',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SUPABASE_SERVICE_ROLE_KEY'
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 /**
@@ -38,7 +38,11 @@ router.post('/register', async (req, res) => {
         data: {
           name,
           role,
-          password // Store password in metadata for backend retrieval after verification
+          // SECURITY WARNING: Storing plaintext password in metadata is a temporary 
+          // development workaround to allow the backend /verify route to create the 
+          // MongoDB user after email click. This should be replaced with a 
+          // PendingUser collection or custom auth provider.
+          password
         }
       }
     });
@@ -97,7 +101,7 @@ router.post('/login', async (req, res) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'your_jwt_secret',
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -270,17 +274,17 @@ router.post('/resend-verification', async (req, res) => {
   try {
     const { email } = req.body;
 
-    // Find user in MongoDB
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
     }
 
-    if (user.isEmailVerified) {
+    // Check if already verified in MongoDB (if user exists there)
+    const existingUser = await User.findOne({ email });
+    if (existingUser && existingUser.isEmailVerified) {
       return res.status(400).json({ error: 'Email already verified' });
     }
 
-    // Resend verification email via Supabase
+    // Resend via Supabase — user may not yet exist in MongoDB (pending verification)
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email
@@ -385,7 +389,7 @@ router.post('/reset-password', async (req, res) => {
  * Get user by ID (for applicants modal)
  * Returns limited user information for task applications
  */
-router.get('/user/:id', async (req, res) => {
+router.get('/user/:id', verifySupabaseUser, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('name email profilePicture skills location phone');
     if (!user) {

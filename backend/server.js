@@ -12,6 +12,14 @@ const dotenv = require('dotenv');
 // Load environment variables from .env file
 dotenv.config();
 
+// Fail fast if critical environment variables are missing
+const REQUIRED_ENV = ['JWT_SECRET', 'MONGODB_URI', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+const missingEnv = REQUIRED_ENV.filter(key => !process.env[key]);
+if (missingEnv.length > 0) {
+  console.error(`Missing required environment variables: ${missingEnv.join(', ')}`);
+  process.exit(1);
+}
+
 // Connect to MongoDB with fallback to local instance
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/kazilink')
 .then(() => console.log('MongoDB connected successfully'))
@@ -24,7 +32,7 @@ const app = express();
 // CORS configuration for cross-origin requests
 // Allows requests from production frontend and local development servers
 app.use(cors({
-  origin: ['https://kazi-link-seven.vercel.app', 'http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true, // Allow cookies and authorization headers
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -98,6 +106,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Access at http://localhost:${PORT}`);
-  console.log('Available routes:');
-  console.log('- GET    /');
 });

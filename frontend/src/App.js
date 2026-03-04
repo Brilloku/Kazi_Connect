@@ -13,8 +13,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from './context/AuthContext';
 import { RealtimeProvider } from './context/RealtimeContext';
 
-// HTTP client with interceptors
-import axiosInstance from './utils/axios';
+// Import axios to register request/response interceptors (side-effect only)
+import './utils/axios';
 
 // Navigation components
 import UserNavbar from './components/UserNavbar';
@@ -109,6 +109,18 @@ function App() {
                   <ProtectedRoute>
                     <Profile />
                   </ProtectedRoute>
+                }
+              />
+
+              {/* Catch-all 404 route */}
+              <Route
+                path="*"
+                element={
+                  <div className="flex flex-col items-center justify-center h-screen">
+                    <h1 className="text-4xl font-bold text-gray-700">404</h1>
+                    <p className="text-gray-500 mt-2">Page not found.</p>
+                    <a href="/" className="mt-4 text-blue-600 underline">Go home</a>
+                  </div>
                 }
               />
             </Routes>
