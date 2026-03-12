@@ -42,6 +42,9 @@
       "last 1 safari version"
     ]
   },
+  "overrides": {
+    "underscore": ">=1.13.7"
+  },
   "devDependencies": {
     "baseline-browser-mapping": "^2.10.0",
     "react-scripts": "^5.0.1"
